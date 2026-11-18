@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bg-app: #F7F7F5;
+  --color-surface: #FFFFFF;
+  --color-surface-border: #E7E5E0;
+  --color-ink: #14171A;
+  --color-ink-hover: #2A2F35;
+  --color-muted: #6B7280;
+  --color-subtle: #9CA3AF;
+  --color-accent: #F5B301;
+  --color-accent-dark: #D49B00;
+
+  --color-status-success: #16A34A;
+  --color-status-success-bg: #DCFCE7;
+  --color-status-warning: #B45309;
+  --color-status-warning-bg: #FEF3C7;
+  --color-status-danger: #DC2626;
+  --color-status-danger-bg: #FEE2E2;
+  --color-status-info: #2563EB;
+  --color-status-info-bg: #DBEAFE;
+  --color-status-neutral: #4B5563;
+  --color-status-neutral-bg: #F3F4F6;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-app: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface-border: #E7E5E0;
+  --ink: #14171A;
+  --muted: #6B7280;
+  --subtle: #9CA3AF;
+  --accent: #F5B301;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #F7F7F5;
+  color: #14171A;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes routeDash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.route-dash-animate {
+  stroke-dasharray: 4 4;
+  animation: routeDash 1.4s linear infinite;
+}
+
+@keyframes laserScan {
+  0% {
+    top: 10%;
+    opacity: 0.3;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+  100% {
+    top: 10%;
+    opacity: 0.3;
+  }
+}
+
+.laser-scan-animate {
+  animation: laserScan 2s ease-in-out infinite;
+}
+
+/* Hide Next.js development portal indicator icon in demo captures */
+nextjs-portal,
+#__next-build-watcher,
+[data-nextjs-toast] {
+  display: none !important;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E7E5E0;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
 }
