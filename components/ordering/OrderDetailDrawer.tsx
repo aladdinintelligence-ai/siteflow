@@ -25,7 +25,7 @@ export const OrderDetailDrawer: React.FC<OrderDetailDrawerProps> = ({
   if (!order) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#14171A]/40 backdrop-blur-xs flex justify-end animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[60] bg-[#14171A]/40 backdrop-blur-xs flex justify-end animate-in fade-in duration-150">
       <div className="w-full max-w-xl bg-white h-full shadow-2xl border-l border-[#E7E5E0] flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200">
         {/* Drawer Header */}
         <div className="p-6 border-b border-[#E7E5E0] flex items-center justify-between">

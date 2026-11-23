@@ -27,7 +27,7 @@ export default function DriverPage() {
   const driverProfile = store.drivers.find((d) => d.id === activeDriverId) || store.drivers[0];
 
   return (
-    <div className="flex-1 w-full bg-[#F7F7F5] py-2 sm:py-8 px-2 sm:px-4 flex items-center justify-center">
+    <div className="flex-1 w-full bg-transparent py-2 sm:py-8 px-2 sm:px-4 flex items-center justify-center">
       <PhoneFrame>
         {/* Driver App Header */}
         <div className="bg-[#FFFFFF] border-b border-[#E7E5E0] p-3 sm:p-4 space-y-3">

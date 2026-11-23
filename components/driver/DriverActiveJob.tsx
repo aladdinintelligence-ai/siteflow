@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { DriverJobView, Site } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
-import { SimulatedQrScanner } from './SimulatedQrScanner';
+import { CameraQrScanner } from './CameraQrScanner';
 import { LiveTrackingCard } from '@/components/shared/LiveTrackingCard';
 import { SitePlan } from '@/components/shared/SitePlan';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -24,17 +24,15 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
 }) => {
   const [isScanning, setIsScanning] = useState(false);
 
-  const { scanIn, scanOut, setGuidedStep } = useAppStore();
+  const { scanIn, scanOut } = useAppStore();
 
   const handleScanSuccess = () => {
     setIsScanning(false);
     scanIn(job.visitId, job.gateId);
-    setGuidedStep(5);
   };
 
   const handleScanOut = () => {
     scanOut(job.visitId);
-    setGuidedStep(7);
     if (onJobCompleted) {
       onJobCompleted();
     }
@@ -200,9 +198,9 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
         </div>
       )}
 
-      {/* QR Scanner Modal */}
+      {/* Real Device Camera QR Scanner with Simulation Fallback */}
       {isScanning && (
-        <SimulatedQrScanner
+        <CameraQrScanner
           orderNumber={job.orderNumber}
           gateName={job.gateName}
           onScanSuccess={handleScanSuccess}

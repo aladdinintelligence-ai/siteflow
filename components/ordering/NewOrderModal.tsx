@@ -107,7 +107,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
   const calculatedTotal = orderedQty * unitPrice;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#14171A]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[60] bg-[#14171A]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-150">
       <div className="bg-[#FFFFFF] border border-[#E7E5E0] rounded-[12px] shadow-2xl w-full max-w-xl my-8 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#E7E5E0] flex items-center justify-between">

@@ -19,6 +19,7 @@ import {
   SEED_ORDERS,
   SEED_VISITS,
 } from '@/data/seed';
+import { api, getSocket, setAuthToken } from './api';
 
 export interface ToastInfo {
   id: number;
@@ -38,24 +39,17 @@ export interface AppState {
   currentSiteId: string;
   activeDriverId: string;
   activeSupplierId: string;
-  guidedStep: number;
-  guidedModeActive: boolean;
 
   // Real-time Toast Notifications for cross-role feedback
   toast: ToastInfo | null;
   showToast: (message: string) => void;
   clearToast: () => void;
 
-  // Actions - Navigation & Demo
+  // Actions - Navigation & Operations
   setCurrentRole: (role: RoleId) => void;
   setCurrentSite: (siteId: string) => void;
   setActiveDriver: (driverId: string) => void;
   setActiveSupplier: (supplierId: string) => void;
-  setGuidedStep: (step: number) => void;
-  nextGuidedStep: () => void;
-  prevGuidedStep: () => void;
-  toggleGuidedMode: (active?: boolean) => void;
-  resetDemoData: () => void;
 
   // Actions - 7-Step Workflow Operations
   createOrder: (order: Omit<Order, 'id' | 'orderNumber' | 'status' | 'createdAt'>) => string;
@@ -89,8 +83,6 @@ export const useAppStore = create<AppState>()(
       currentSiteId: 'site-btr',
       activeDriverId: 'drv-dave',
       activeSupplierId: 'sup-cemex',
-      guidedStep: 1,
-      guidedModeActive: true,
       toast: null,
 
       showToast: (message: string) => {
@@ -106,41 +98,15 @@ export const useAppStore = create<AppState>()(
 
       clearToast: () => set({ toast: null }),
 
-      setCurrentRole: (role) => set({ currentRole: role }),
+      setCurrentRole: (role) => {
+        set({ currentRole: role });
+        api.auth.demoSwitch(role).then((res) => {
+          if (res?.token) setAuthToken(res.token);
+        }).catch(() => {});
+      },
       setCurrentSite: (siteId) => set({ currentSiteId: siteId }),
       setActiveDriver: (driverId) => set({ activeDriverId: driverId }),
       setActiveSupplier: (supplierId) => set({ activeSupplierId: supplierId }),
-
-      setGuidedStep: (step) => set({ guidedStep: Math.min(Math.max(step, 1), 7) }),
-      nextGuidedStep: () => {
-        const { guidedStep } = get();
-        if (guidedStep < 7) {
-          set({ guidedStep: guidedStep + 1 });
-        }
-      },
-      prevGuidedStep: () => {
-        const { guidedStep } = get();
-        if (guidedStep > 1) {
-          set({ guidedStep: guidedStep - 1 });
-        }
-      },
-      toggleGuidedMode: (active) =>
-        set((state) => ({ guidedModeActive: active !== undefined ? active : !state.guidedModeActive })),
-
-      resetDemoData: () => {
-        set({
-          orders: SEED_ORDERS,
-          visits: SEED_VISITS,
-          sites: SEED_SITES,
-          suppliers: SEED_SUPPLIERS,
-          drivers: SEED_DRIVERS,
-          currentSiteId: 'site-btr',
-          activeDriverId: 'drv-dave',
-          activeSupplierId: 'sup-cemex',
-          guidedStep: 1,
-          toast: { id: Date.now(), message: 'Demo data reset to clean seed state' },
-        });
-      },
 
       createOrder: (orderInput) => {
         const id = `ord-${Date.now().toString().slice(-4)}`;
@@ -153,11 +119,25 @@ export const useAppStore = create<AppState>()(
           createdAt: new Date().toISOString(),
         };
 
-        const { guidedStep, showToast } = get();
+        const { showToast } = get();
         set((state) => ({
           orders: [newOrder, ...state.orders],
-          guidedStep: guidedStep === 1 ? 2 : guidedStep,
         }));
+
+        // Persist to real Node.js & MongoDB backend
+        api.orders.create({
+          type: orderInput.type,
+          category: orderInput.category,
+          description: orderInput.description,
+          orderedQty: orderInput.orderedQty,
+          unit: orderInput.unit,
+          siteKey: orderInput.siteId,
+          destinationId: orderInput.destinationId,
+          supplierKey: orderInput.supplierId,
+          timeSlot: orderInput.timeSlot,
+          unitPrice: orderInput.unitPrice,
+          commercialTerms: orderInput.commercialTerms,
+        }).catch((err) => console.warn('[Backend Sync]', err.message));
 
         showToast(`Order ${orderNumber} created & sent to ${newOrder.supplierName}`);
         return id;
@@ -220,7 +200,7 @@ export const useAppStore = create<AppState>()(
       },
 
       assignDriver: (orderId, driverId, vehicleReg) => {
-        const { orders, visits, drivers, sites, guidedStep, showToast } = get();
+        const { orders, visits, drivers, sites, showToast } = get();
         const order = orders.find((o) => o.id === orderId);
         const driver = drivers.find((d) => d.id === driverId);
         const reg = vehicleReg || driver?.defaultVehicleReg || 'REG-UNASSIGNED';
@@ -291,8 +271,14 @@ export const useAppStore = create<AppState>()(
           orders: updatedOrders,
           visits: updatedVisits,
           activeDriverId: driverId,
-          guidedStep: guidedStep === 2 ? 3 : guidedStep,
         });
+
+        // Persist to real backend
+        api.supplier.acceptAndAssign(orderId, {
+          driverKey: driverId,
+          vehicleReg: reg,
+          eta: '25 mins (10:45 AM)',
+        }).catch((err) => console.warn('[Backend Sync]', err.message));
 
         showToast(`Driver ${driver?.name || 'allocated'} (${reg}) assigned to ${order?.orderNumber || 'order'}`);
       },
@@ -369,6 +355,13 @@ export const useAppStore = create<AppState>()(
           ),
         }));
 
+        // Persist to real backend
+        api.gate.scanIn({
+          visitId,
+          gateId,
+          orderNumber: targetVisit?.orderNumber,
+        }).catch((err) => console.warn('[Backend Sync]', err.message));
+
         get().showToast(`Booking retrieved: Gate entry authorised for ${targetVisit?.orderNumber || 'visit'}`);
       },
 
@@ -385,6 +378,8 @@ export const useAppStore = create<AppState>()(
               : v
           ),
         }));
+
+        api.gate.flagException(visitId, reason).catch((err) => console.warn('[Backend Sync]', err.message));
         get().showToast(`Gate exception flagged: ${reason}`);
       },
 
@@ -437,6 +432,14 @@ export const useAppStore = create<AppState>()(
           ),
         }));
 
+        // Persist verification to real backend
+        const formData = new FormData();
+        formData.append('actualReceivedQty', String(receivedQty));
+        formData.append('isDisputed', String(isDisputed));
+        formData.append('proofNotes', notes || '');
+        if (reasonCode) formData.append('reasonCode', reasonCode);
+        api.verify.verifyDelivery(visitId, formData).catch((err) => console.warn('[Backend Sync]', err.message));
+
         get().showToast(
           hasDiscrepancy
             ? `Delivery verified with discrepancy: ${variance} ${targetVisit.unit} variance recorded`
@@ -479,6 +482,12 @@ export const useAppStore = create<AppState>()(
               : o
           ),
         }));
+
+        // Persist scan out to real backend
+        api.exit.scanOut({
+          visitId,
+          orderNumber: targetVisit.orderNumber,
+        }).catch((err) => console.warn('[Backend Sync]', err.message));
 
         get().showToast(`Visit completed: ${duration}m turnaround duration logged`);
       },

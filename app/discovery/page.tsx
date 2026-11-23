@@ -74,7 +74,7 @@ export default function DiscoveryPage() {
   ];
 
   return (
-    <div className="flex-1 w-full bg-[#F7F7F5] py-10 px-4 sm:px-6">
+    <div className="flex-1 w-full bg-transparent py-10 px-4 sm:px-6">
       <div className="max-w-[840px] mx-auto space-y-8">
         {/* Header */}
         <div className="space-y-3">

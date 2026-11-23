@@ -45,7 +45,7 @@ export const SupplierOrderDetailsDrawer: React.FC<SupplierOrderDetailsDrawerProp
   const netInvoiced = Math.max(0, order.totalPrice - creditNoteAmount);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-xs">
+    <div className="fixed inset-0 z-[60] flex justify-end bg-black/30 backdrop-blur-xs">
       <div className="bg-white w-full max-w-xl h-full shadow-2xl flex flex-col border-l border-[#E7E5E0] animate-in slide-in-from-right duration-200">
         {/* Drawer Header */}
         <div className="px-6 py-5 border-b border-[#E7E5E0] flex items-center justify-between bg-white shrink-0">

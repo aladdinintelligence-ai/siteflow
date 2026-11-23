@@ -218,14 +218,3 @@ export interface DriverJobView {
   approvedRoute?: SiteRoute;
 }
 
-export interface DemoStep {
-  step: number;
-  title: string;
-  role: RoleId;
-  targetUrl: string;
-  summary: string;
-  instruction: string;
-  buttonLabel: string;
-  targetId?: string;
-}
-

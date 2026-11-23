@@ -26,7 +26,7 @@ export const VerifyDeliveryModal: React.FC<VerifyDeliveryModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { verifyDelivery, guidedStep, setGuidedStep } = useAppStore();
+  const { verifyDelivery } = useAppStore();
 
   const [receivedQty, setReceivedQty] = useState<number>(0);
   const [isDisputed, setIsDisputed] = useState<boolean>(false);
@@ -59,14 +59,6 @@ export const VerifyDeliveryModal: React.FC<VerifyDeliveryModalProps> = ({
     setIsDisputed(false);
   };
 
-  const handleShortagePreset = () => {
-    // Quick demo helper: set 1.5 units short
-    const shortVal = Math.max(0, Number((visit.orderedQty - 1.5).toFixed(1)));
-    setReceivedQty(shortVal);
-    setReasonCode('shortage');
-    setProofNote('Weighbridge ticket confirmed 1.5 unit shortage on discharge. Driver countersigned.');
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -89,15 +81,11 @@ export const VerifyDeliveryModal: React.FC<VerifyDeliveryModalProps> = ({
       hasVariance ? reasonCode : undefined
     );
 
-    if (guidedStep === 6) {
-      setGuidedStep(7);
-    }
-
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
       <div className="bg-white border border-[#E7E5E0] rounded-[12px] w-full max-w-lg shadow-[0_4px_12px_rgba(20,23,26,0.08)] overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7E5E0]">
@@ -175,14 +163,7 @@ export const VerifyDeliveryModal: React.FC<VerifyDeliveryModalProps> = ({
                   onClick={handleFullDelivery}
                   className="h-6 px-2 bg-white border border-[#E7E5E0] hover:bg-[#DCFCE7] hover:text-[#16A34A] text-[#14171A] rounded text-[10px] font-medium transition-colors cursor-pointer"
                 >
-                  100% Full Match
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShortagePreset}
-                  className="h-6 px-2 bg-white border border-[#E7E5E0] hover:bg-[#FEE2E2] hover:text-[#DC2626] text-[#6B7280] rounded text-[10px] font-medium transition-colors cursor-pointer"
-                >
-                  -1.5 {visit.unit} Shortage
+                  Match Ordered Quantity
                 </button>
               </div>
             </div>

@@ -78,7 +78,7 @@ export const AssignDriverModal: React.FC<AssignDriverModalProps> = ({
   const selectedDriver = supplierDrivers.find((d) => d.id === selectedDriverId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
       <div className="bg-white border border-[#E7E5E0] rounded-[12px] w-full max-w-lg shadow-[0_4px_12px_rgba(20,23,26,0.08)] overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7E5E0]">
