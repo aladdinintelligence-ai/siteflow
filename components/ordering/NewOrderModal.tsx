@@ -15,13 +15,14 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
   const { sites, suppliers, currentSiteId, createOrder } = useAppStore();
 
   const [type, setType] = useState<OrderType>('material');
-  const [siteId, setSiteId] = useState(currentSiteId || sites[0]?.id || 'site-btr');
+  const [siteId, setSiteId] = useState(currentSiteId || sites[0]?.id || 'site-chatham');
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || 'sup-cemex');
   const [destinationId, setDestinationId] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [orderedQty, setOrderedQty] = useState<number>(20);
   const [unit, setUnit] = useState('tonnes');
+  const [vehicleReg, setVehicleReg] = useState('KX68 VKF');
   const [timeSlot, setTimeSlot] = useState('09:00 - 10:00');
   const [unitPrice, setUnitPrice] = useState<number>(32);
   const [commercialTerms, setCommercialTerms] = useState('Standard Net 30 days.');
@@ -91,8 +92,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
       description: description.trim(),
       orderedQty,
       unit,
-      destinationId: destination?.id || 'dest-default',
-      destinationName: destination?.name || 'Laydown Area',
+      destinationId: destination?.id || selectedSite?.destinations[0]?.id || 'dest-chatham-dock',
+      destinationName: destination?.name || selectedSite?.destinations[0]?.name || 'Site Offload Zone',
+      vehicleReg: vehicleReg.trim() ? vehicleReg.trim().toUpperCase() : undefined,
       requestedDate: new Date().toISOString().split('T')[0],
       timeSlot,
       unitPrice,
@@ -198,8 +200,8 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
             </div>
           </div>
 
-          {/* Supplier & Time Slot */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Supplier & Logistics Allocation */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
                 Supplier
@@ -215,6 +217,19 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
+                Vehicle Reg / Unique ID
+              </label>
+              <input
+                type="text"
+                value={vehicleReg}
+                onChange={(e) => setVehicleReg(e.target.value)}
+                placeholder="e.g. KX68 VKF"
+                className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs font-mono font-medium text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
+              />
             </div>
 
             <div>

@@ -4,7 +4,6 @@ export type RoleId =
   | 'supplier'
   | 'driver'
   | 'marshal'
-  | 'supervisor'
   | 'analyst';
 
 export type OrderStatus =
@@ -128,6 +127,7 @@ export interface Order {
   unit: string; // tonnes, m3, loads, units, hours
   destinationId: string;
   destinationName: string;
+  vehicleReg?: string; // Vehicle registration or unique identification
   requestedDate: string; // YYYY-MM-DD
   timeSlot: string; // e.g. 08:30 - 09:30
   // Commercial details strictly omitted in driver selector

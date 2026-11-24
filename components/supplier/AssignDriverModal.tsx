@@ -39,7 +39,7 @@ export const AssignDriverModal: React.FC<AssignDriverModalProps> = ({
     if (order && supplierDrivers.length > 0) {
       const defaultDrv = supplierDrivers[0];
       setSelectedDriverId(defaultDrv.id);
-      setVehicleReg(defaultDrv.defaultVehicleReg);
+      setVehicleReg(order.vehicleReg || defaultDrv.defaultVehicleReg);
       setDispatchSlot(order.timeSlot || 'Immediate dispatch');
       setDriverNotes('Follow approved site access route. Standard PPE mandatory on discharge.');
       setError(null);

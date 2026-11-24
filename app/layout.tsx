@@ -1,19 +1,8 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { TopNav } from '@/components/shared/TopNav';
 import { ToastNotice } from '@/components/shared/ToastNotice';
 import { AuthProvider } from '@/context/AuthContext';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   title: 'DJ Civil SiteFlow | Construction Operations & Gate Logistics',
@@ -27,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} style={{ colorScheme: 'light' }}>
+    <html lang="en" className="h-full antialiased font-sans" style={{ colorScheme: 'light' }}>
       <body
         className="civil-blueprint-bg min-h-full w-full max-w-full overflow-x-hidden flex flex-col bg-[#F8F8F6] text-[#14171A] font-sans"
         style={{ colorScheme: 'light' }}

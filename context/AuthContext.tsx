@@ -34,7 +34,6 @@ export const ROLE_HOME_PATHS: Record<RoleId, string> = {
   supplier: '/supplier',
   driver: '/driver',
   marshal: '/marshal',
-  supervisor: '/supervisor',
   analyst: '/analyst',
 };
 
@@ -45,7 +44,6 @@ export const ROUTE_PERMISSIONS: Record<string, RoleId[]> = {
   '/supplier': ['supplier', 'director'],
   '/driver': ['driver', 'director'],
   '/marshal': ['marshal', 'director'],
-  '/supervisor': ['supervisor', 'director'],
   '/analyst': ['analyst', 'director'],
   '/discovery': ['director'],
 };

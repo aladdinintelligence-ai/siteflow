@@ -8,7 +8,6 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/supplier': ['supplier', 'director'],
   '/driver': ['driver', 'director'],
   '/marshal': ['marshal', 'director'],
-  '/supervisor': ['supervisor', 'director'],
   '/analyst': ['analyst', 'director'],
   '/discovery': ['director'],
 };
@@ -19,7 +18,6 @@ const ROLE_DEFAULT_PATHS: Record<string, string> = {
   supplier: '/supplier',
   driver: '/driver',
   marshal: '/marshal',
-  supervisor: '/supervisor',
   analyst: '/analyst',
 };
 
@@ -103,7 +101,6 @@ export const config = {
     '/supplier/:path*',
     '/driver/:path*',
     '/marshal/:path*',
-    '/supervisor/:path*',
     '/analyst/:path*',
     '/discovery/:path*',
   ],

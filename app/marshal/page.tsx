@@ -6,28 +6,28 @@ import { Visit } from '@/lib/types';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { MarshalFlagModal } from '@/components/marshal/MarshalFlagModal';
 import { MarshalManualEntryModal } from '@/components/marshal/MarshalManualEntryModal';
+import { PresentGateQrModal } from '@/components/marshal/PresentGateQrModal';
 import { formatDateTime } from '@/lib/utils';
 import {
   ShieldCheck,
   ShieldAlert,
   Truck,
   Clock,
-  ArrowRight,
   CheckCircle2,
   AlertTriangle,
   QrCode,
   Search,
   MapPin,
-  Calendar,
   LogOut,
   Radio,
+  UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type MarshalTab = 'expected' | 'onsite' | 'exits';
 
 export default function MarshalPage() {
-  const { visits, sites, currentSiteId, setCurrentSite, scanOut } = useAppStore();
+  const { visits, sites, currentSiteId, scanOut, marshalAuthoriseEntry } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<MarshalTab>('expected');
   const [selectedGateId, setSelectedGateId] = useState<string>('all');
@@ -36,6 +36,7 @@ export default function MarshalPage() {
   // Modals
   const [flagVisit, setFlagVisit] = useState<Visit | null>(null);
   const [entryVisit, setEntryVisit] = useState<Visit | null>(null);
+  const [isPresentQrOpen, setIsPresentQrOpen] = useState(false);
 
   const currentSite = sites.find((s) => s.id === currentSiteId) || sites[0];
 
@@ -53,43 +54,49 @@ export default function MarshalPage() {
         (v.vehicleReg && v.vehicleReg.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (v.driverName && v.driverName.toLowerCase().includes(searchQuery.toLowerCase())) ||
         v.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        v.destinationName.toLowerCase().includes(searchQuery.toLowerCase());
+        v.destinationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        v.category.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesGate && matchesSearch;
     });
   }, [siteVisits, selectedGateId, searchQuery]);
 
   // Tab categorization
-  const expectedVisits = useMemo(() => {
-    return gateFilteredVisits.filter((v) =>
-      ['scheduled', 'en_route'].includes(v.status) && !v.gateEntryAt
-    );
+  // Tab 1: Gate Clearance Queue (at_gate shown first, then en_route / scheduled)
+  const queueVisits = useMemo(() => {
+    return gateFilteredVisits
+      .filter((v) => ['at_gate', 'scheduled', 'en_route'].includes(v.status) && !v.entryAuthorised)
+      .sort((a, b) => {
+        if (a.status === 'at_gate' && b.status !== 'at_gate') return -1;
+        if (b.status === 'at_gate' && a.status !== 'at_gate') return 1;
+        return 0;
+      });
   }, [gateFilteredVisits]);
 
+  // Tab 2: Currently On Site (inside perimeter, authorized, navigating or offloading)
   const onSiteVisits = useMemo(() => {
-    return gateFilteredVisits.filter((v) =>
-      ['on_site', 'verified'].includes(v.status) && !v.gateExitAt
+    return gateFilteredVisits.filter(
+      (v) => (v.status === 'on_site' || (v.entryAuthorised && !v.gateExitAt)) && v.status !== 'completed'
     );
   }, [gateFilteredVisits]);
 
+  // Tab 3: Completed Exits & Gate Audit
   const exitLogs = useMemo(() => {
-    return gateFilteredVisits.filter((v) =>
-      v.status === 'completed' || v.status === 'flagged' || Boolean(v.gateExitAt)
+    return gateFilteredVisits.filter(
+      (v) => v.status === 'completed' || v.status === 'flagged' || Boolean(v.gateExitAt)
     );
   }, [gateFilteredVisits]);
 
   // KPI Calculations
+  const atGateCount = siteVisits.filter((v) => v.status === 'at_gate').length;
   const expectedCount = siteVisits.filter(
     (v) => ['scheduled', 'en_route'].includes(v.status) && !v.gateEntryAt
   ).length;
-
   const onSiteCount = siteVisits.filter(
-    (v) => ['on_site', 'verified'].includes(v.status) && !v.gateExitAt
+    (v) => (v.status === 'on_site' || (v.entryAuthorised && !v.gateExitAt)) && v.status !== 'completed'
   ).length;
-
   const exitedCount = siteVisits.filter(
     (v) => v.status === 'completed' || Boolean(v.gateExitAt)
   ).length;
-
   const flaggedCount = siteVisits.filter(
     (v) => v.marshalFlagged || v.status === 'flagged'
   ).length;
@@ -109,27 +116,37 @@ export default function MarshalPage() {
             </span>
           </div>
           <p className="text-xs text-[#6B7280] mt-0.5">
-            Automated QR gate clearance, security exceptions, and real-time site headcount for {currentSite.name}.
+            QR gate check-in, booking matching, route authorisation, and site exit logging for {currentSite.name}.
           </p>
         </div>
 
-        {/* Gate Selector */}
-        <div className="flex items-center gap-2 bg-white border border-[#E7E5E0] rounded-lg p-1.5 shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280] pl-2 hidden sm:inline">
-            Active Gate:
-          </span>
-          <select
-            value={selectedGateId}
-            onChange={(e) => setSelectedGateId(e.target.value)}
-            className="h-8 px-2.5 bg-[#F7F7F5] border border-[#E7E5E0] rounded-md text-xs font-medium text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
+        {/* Header Actions: Present QR & Active Gate Filter */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsPresentQrOpen(true)}
+            className="h-9 px-3.5 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer shadow-[0_1px_2px_rgba(20,23,26,0.04)]"
           >
-            <option value="all">All Site Gates</option>
-            {currentSite.gates.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
+            <QrCode className="w-4 h-4 text-[#F5B301]" />
+            <span>Present Gate QR</span>
+          </button>
+
+          <div className="flex items-center gap-2 bg-white border border-[#E7E5E0] rounded-lg p-1.5 shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280] pl-2 hidden sm:inline">
+              Active Gate:
+            </span>
+            <select
+              value={selectedGateId}
+              onChange={(e) => setSelectedGateId(e.target.value)}
+              className="h-8 px-2.5 bg-[#F7F7F5] border border-[#E7E5E0] rounded-md text-xs font-medium text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
+            >
+              <option value="all">All Site Gates</option>
+              {currentSite.gates.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -137,13 +154,21 @@ export default function MarshalPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white border border-[#E7E5E0] rounded-[12px] p-3.5 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)] min-w-0">
           <span className="text-[10px] sm:text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block truncate">
-            Expected Today
+            Arrivals Queue
           </span>
-          <span className="text-xl sm:text-[28px] font-semibold text-[#14171A] tabular-nums mt-0.5 block truncate">
-            {expectedCount}
-          </span>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <span className="text-xl sm:text-[28px] font-semibold text-[#14171A] tabular-nums block truncate">
+              {queueVisits.length}
+            </span>
+            {atGateCount > 0 && (
+              <span className="text-[11px] font-semibold text-[#B45309] bg-[#FEF3C7] px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#B45309] animate-pulse" />
+                {atGateCount} At Gate
+              </span>
+            )}
+          </div>
           <span className="text-[10px] sm:text-[11px] text-[#9CA3AF] mt-0.5 block truncate">
-            Booked slot windows
+            {expectedCount} en-route · {atGateCount} checked in
           </span>
         </div>
 
@@ -167,7 +192,7 @@ export default function MarshalPage() {
             {exitedCount}
           </span>
           <span className="text-[10px] sm:text-[11px] text-[#9CA3AF] mt-0.5 block truncate">
-            Turnaround verified
+            Attendance complete
           </span>
         </div>
 
@@ -197,10 +222,13 @@ export default function MarshalPage() {
                 : 'text-[#6B7280] hover:text-[#14171A]'
             )}
           >
-            <span>Expected Arrivals</span>
-            {expectedVisits.length > 0 && (
-              <span className="px-1.5 py-0.2 bg-[#FEF3C7] text-[#B45309] text-[10px] font-semibold rounded-full">
-                {expectedVisits.length}
+            <span>Gate Clearance Queue</span>
+            {queueVisits.length > 0 && (
+              <span className={cn(
+                'px-1.5 py-0.2 text-[10px] font-semibold rounded-full',
+                atGateCount > 0 ? 'bg-[#FEF3C7] text-[#B45309]' : 'bg-[#F3F4F6] text-[#4B5563]'
+              )}>
+                {queueVisits.length}
               </span>
             )}
           </button>
@@ -231,7 +259,7 @@ export default function MarshalPage() {
                 : 'text-[#6B7280] hover:text-[#14171A]'
             )}
           >
-            <span>Gate Logs & Exits</span>
+            <span>Gate Logs & Completed Exits</span>
             <span className="px-1.5 py-0.2 bg-[#F3F4F6] text-[#4B5563] text-[10px] font-semibold rounded-full">
               {exitLogs.length}
             </span>
@@ -244,7 +272,7 @@ export default function MarshalPage() {
             <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search VRN, driver name, supplier, or order ref..."
+              placeholder="Search booking ref, vehicle reg, driver, supplier, material..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-10 pl-9 pr-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
@@ -252,108 +280,137 @@ export default function MarshalPage() {
           </div>
 
           <div className="flex items-center gap-2 text-[#6B7280] text-xs">
-            <QrCode className="w-4 h-4 text-[#14171A]" />
-            <span>Gate Totem QR Code Active</span>
+            <button
+              onClick={() => setIsPresentQrOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-[#14171A] hover:underline font-medium cursor-pointer"
+            >
+              <QrCode className="w-4 h-4 text-[#F5B301]" />
+              <span>Show Gate Totem QR Code</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Tab 1: Expected Arrivals */}
+      {/* TAB 1: GATE CLEARANCE QUEUE (Expected, Checked In at Gate) */}
       {activeTab === 'expected' && (
         <div className="bg-white border border-[#E7E5E0] rounded-[12px] shadow-[0_1px_2px_rgba(20,23,26,0.04)] overflow-hidden">
           <div className="overflow-x-auto min-w-0">
-            <table className="w-full min-w-[720px] text-left text-xs border-collapse">
+            <table className="w-full min-w-[780px] text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-[#E7E5E0] bg-white h-11 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider select-none">
-                  <th className="px-4 py-2">VRN / Booking</th>
-                  <th className="px-4 py-2">Driver & Supplier</th>
-                  <th className="px-4 py-2">Offload Destination</th>
-                  <th className="px-4 py-2">Cargo / Spec</th>
-                  <th className="px-4 py-2">Slot & Telematics</th>
-                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Booking ID</th>
+                  <th className="px-4 py-2">Site & Destination</th>
+                  <th className="px-4 py-2">Supplier & Driver</th>
+                  <th className="px-4 py-2">Material / Service</th>
+                  <th className="px-4 py-2">Vehicle / Unique ID</th>
+                  <th className="px-4 py-2">Status & Timestamps</th>
                   <th className="px-4 py-2 text-right">Gate Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E7E5E0]">
-                {expectedVisits.length === 0 ? (
+                {queueVisits.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-12 text-center text-[#6B7280]">
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <CheckCircle2 className="w-8 h-8 text-[#16A34A] stroke-1" />
                         <span className="font-medium text-[#14171A]">
-                          No pending arrivals in queue
+                          Gate queue is clear
                         </span>
                         <p className="text-xs text-[#9CA3AF] max-w-sm">
-                          Dispatched supplier vehicles approaching the gate will appear here with live ETA tracking.
+                          Arriving drivers scanning the gate QR code will appear here instantly for entry clearance.
                         </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  expectedVisits.map((visit) => {
+                  queueVisits.map((visit) => {
+                    const isAtGate = visit.status === 'at_gate';
                     const hasTracking = Boolean(visit.tracking);
 
                     return (
-                      <tr key={visit.id} className="h-14 hover:bg-[#F7F7F5] transition-colors">
+                      <tr
+                        key={visit.id}
+                        className={cn(
+                          'h-15 transition-colors',
+                          isAtGate
+                            ? 'bg-[#FEF3C7]/25 hover:bg-[#FEF3C7]/40 border-l-4 border-l-[#F5B301]'
+                            : 'hover:bg-[#F7F7F5]'
+                        )}
+                      >
+                        {/* 1. Booking / Order ID */}
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-mono font-semibold text-sm text-[#14171A] block">
-                            {visit.vehicleReg}
-                          </span>
-                          <span className="font-mono text-[11px] text-[#6B7280]">
+                          <span className="font-mono font-semibold text-xs text-[#14171A] block">
                             {visit.orderNumber}
+                          </span>
+                          <span className="text-[10px] font-mono text-[#6B7280]">
+                            {visit.id}
                           </span>
                         </td>
 
+                        {/* 2. Site & Destination */}
                         <td className="px-4 py-3">
-                          <div className="font-medium text-[#14171A]">
+                          <div className="font-medium text-[#14171A] max-w-[200px] truncate">
+                            {visit.destinationName}
+                          </div>
+                          <div className="text-[11px] text-[#6B7280] flex items-center gap-1 mt-0.5">
+                            <MapPin className="w-3 h-3 text-[#9CA3AF]" />
+                            <span className="truncate max-w-[170px]">{visit.siteName}</span>
+                          </div>
+                        </td>
+
+                        {/* 3. Supplier & Driver */}
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-[#14171A] truncate max-w-[170px]">
                             {visit.driverName || 'Driver Unassigned'}
                           </div>
-                          <div className="text-[11px] text-[#9CA3AF]">
+                          <div className="text-[11px] text-[#6B7280] truncate max-w-[170px]">
                             {visit.supplierName}
                           </div>
                         </td>
 
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-[#14171A] max-w-[180px] truncate">
-                            {visit.destinationName}
-                          </div>
-                          <div className="text-[11px] text-[#9CA3AF] flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            <span>Gate 1 Access Route</span>
-                          </div>
-                        </td>
-
+                        {/* 4. Material or Service */}
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-medium text-[#14171A]">
+                          <span className="font-semibold text-[#14171A] tabular-nums">
                             {visit.orderedQty} {visit.unit}
                           </span>
-                          <span className="text-[11px] text-[#6B7280] block max-w-[160px] truncate">
+                          <span className="text-[11px] text-[#6B7280] block max-w-[170px] truncate">
                             {visit.category}
                           </span>
                         </td>
 
+                        {/* 5. Vehicle / Unique ID */}
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {hasTracking && visit.status === 'en_route' ? (
+                          <span className="font-mono font-semibold text-xs text-[#14171A] bg-[#F7F7F5] border border-[#E7E5E0] px-2 py-0.5 rounded-md inline-block">
+                            {visit.vehicleReg || 'REG-PENDING'}
+                          </span>
+                        </td>
+
+                        {/* 6. Status and Timestamps */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {isAtGate ? (
                             <div className="space-y-0.5">
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#2563EB]">
-                                <Radio className="w-3 h-3 animate-pulse" />
-                                ETA {visit.tracking?.estimatedArrivalMinutes}m ({visit.tracking?.distanceRemainingKm}km)
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] text-[11px] font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#B45309] animate-pulse" />
+                                Checked In (At Gate)
                               </span>
-                              <span className="text-[10px] text-[#9CA3AF] block">
-                                Inbound arterial haul road
+                              <span className="font-mono text-[10px] text-[#6B7280] block">
+                                In: {visit.gateEntryAt ? formatDateTime(visit.gateEntryAt) : 'Just now'}
                               </span>
                             </div>
                           ) : (
-                            <div className="font-mono text-[#6B7280]">
-                              Booked slot
+                            <div className="space-y-0.5">
+                              <StatusBadge status={visit.status} size="sm" />
+                              {hasTracking && visit.status === 'en_route' && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#2563EB] block">
+                                  <Radio className="w-2.5 h-2.5 animate-pulse" />
+                                  ETA {visit.tracking?.estimatedArrivalMinutes}m
+                                </span>
+                              )}
                             </div>
                           )}
                         </td>
 
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <StatusBadge status={visit.status} size="sm" />
-                        </td>
-
+                        {/* 7. Gate Actions */}
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
                             <button
@@ -363,12 +420,23 @@ export default function MarshalPage() {
                             >
                               Flag
                             </button>
-                            <button
-                              onClick={() => setEntryVisit(visit)}
-                              className="h-8 px-3 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-md text-[11px] font-medium transition-colors cursor-pointer shadow-[0_1px_2px_rgba(20,23,26,0.04)]"
-                            >
-                              Authorise Entry
-                            </button>
+
+                            {isAtGate ? (
+                              <button
+                                onClick={() => marshalAuthoriseEntry(visit.id)}
+                                className="h-8 px-3 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-md text-[11px] font-semibold transition-colors cursor-pointer shadow-[0_1px_2px_rgba(20,23,26,0.04)] flex items-center gap-1.5"
+                              >
+                                <UserCheck className="w-3.5 h-3.5 text-[#F5B301]" />
+                                <span>Authorise Entry</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setEntryVisit(visit)}
+                                className="h-8 px-3 bg-white border border-[#E7E5E0] hover:bg-[#F7F7F5] text-[#14171A] rounded-md text-[11px] font-medium transition-colors cursor-pointer"
+                              >
+                                Manual Check-In
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -381,19 +449,19 @@ export default function MarshalPage() {
         </div>
       )}
 
-      {/* Tab 2: Currently On Site */}
+      {/* TAB 2: CURRENTLY ON SITE (Inside perimeter) */}
       {activeTab === 'onsite' && (
         <div className="bg-white border border-[#E7E5E0] rounded-[12px] shadow-[0_1px_2px_rgba(20,23,26,0.04)] overflow-hidden">
           <div className="overflow-x-auto min-w-0">
-            <table className="w-full min-w-[720px] text-left text-xs border-collapse">
+            <table className="w-full min-w-[780px] text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-[#E7E5E0] bg-white h-11 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider select-none">
-                  <th className="px-4 py-2">VRN / Ref</th>
-                  <th className="px-4 py-2">Driver & Supplier</th>
-                  <th className="px-4 py-2">Zone & Destination</th>
+                  <th className="px-4 py-2">Booking ID</th>
+                  <th className="px-4 py-2">Site & Destination</th>
+                  <th className="px-4 py-2">Supplier & Driver</th>
+                  <th className="px-4 py-2">Material / Service</th>
+                  <th className="px-4 py-2">Vehicle / Unique ID</th>
                   <th className="px-4 py-2">Entry Authorized At</th>
-                  <th className="px-4 py-2">Cargo / Service</th>
-                  <th className="px-4 py-2">Perimeter Status</th>
                   <th className="px-4 py-2 text-right">Gate Action</th>
                 </tr>
               </thead>
@@ -404,10 +472,10 @@ export default function MarshalPage() {
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <Truck className="w-8 h-8 text-[#9CA3AF] stroke-1" />
                         <span className="font-medium text-[#14171A]">
-                          Perimeter clear
+                          Perimeter is clear
                         </span>
                         <p className="text-xs text-[#9CA3AF] max-w-sm">
-                          No delivery vehicles are currently discharging or navigating on site.
+                          No delivery vehicles are currently navigating or offloading inside the site.
                         </p>
                       </div>
                     </td>
@@ -415,26 +483,19 @@ export default function MarshalPage() {
                 ) : (
                   onSiteVisits.map((visit) => (
                     <tr key={visit.id} className="h-14 hover:bg-[#F7F7F5] transition-colors">
+                      {/* Booking ID */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="font-mono font-semibold text-sm text-[#14171A] block">
-                          {visit.vehicleReg}
-                        </span>
-                        <span className="font-mono text-[11px] text-[#6B7280]">
+                        <span className="font-mono font-semibold text-xs text-[#14171A] block">
                           {visit.orderNumber}
                         </span>
+                        <span className="text-[10px] font-mono text-[#6B7280]">
+                          {visit.id}
+                        </span>
                       </td>
 
+                      {/* Site & Destination */}
                       <td className="px-4 py-3">
-                        <div className="font-medium text-[#14171A]">
-                          {visit.driverName || 'Driver'}
-                        </div>
-                        <div className="text-[11px] text-[#9CA3AF]">
-                          {visit.supplierName}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-[#14171A] max-w-[180px] truncate">
+                        <div className="font-medium text-[#14171A] max-w-[200px] truncate">
                           {visit.destinationName}
                         </div>
                         <span className="text-[10px] text-[#16A34A] bg-[#DCFCE7] px-1.5 py-0.2 rounded-full font-medium inline-block mt-0.5">
@@ -442,30 +503,46 @@ export default function MarshalPage() {
                         </span>
                       </td>
 
-                      <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280]">
-                        {visit.gateEntryAt ? formatDateTime(visit.gateEntryAt) : 'Gate 1 auto'}
+                      {/* Supplier & Driver */}
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-[#14171A] truncate max-w-[170px]">
+                          {visit.driverName || 'Driver'}
+                        </div>
+                        <div className="text-[11px] text-[#6B7280] truncate max-w-[170px]">
+                          {visit.supplierName}
+                        </div>
                       </td>
 
+                      {/* Material / Service */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="font-medium text-[#14171A]">
+                        <span className="font-semibold text-[#14171A] tabular-nums">
                           {visit.orderedQty} {visit.unit}
                         </span>
-                        <span className="text-[11px] text-[#9CA3AF] block truncate max-w-[150px]">
+                        <span className="text-[11px] text-[#6B7280] block max-w-[170px] truncate">
                           {visit.category}
                         </span>
                       </td>
 
+                      {/* Vehicle / Unique ID */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <StatusBadge status={visit.status} size="sm" />
+                        <span className="font-mono font-semibold text-xs text-[#14171A] bg-[#F7F7F5] border border-[#E7E5E0] px-2 py-0.5 rounded-md inline-block">
+                          {visit.vehicleReg || 'REG-PENDING'}
+                        </span>
                       </td>
 
+                      {/* Entry Time */}
+                      <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280]">
+                        {visit.gateEntryAt ? formatDateTime(visit.gateEntryAt) : 'Gate 1'}
+                      </td>
+
+                      {/* Gate Action: Scan Out */}
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <button
                           onClick={() => scanOut(visit.id)}
                           className="h-8 px-3 bg-white border border-[#E7E5E0] hover:bg-[#F7F7F5] text-[#14171A] rounded-md text-[11px] font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5"
                         >
                           <LogOut className="w-3.5 h-3.5 text-[#6B7280]" />
-                          <span>Exit Gate</span>
+                          <span>Log Exit / Scan Out</span>
                         </button>
                       </td>
                     </tr>
@@ -477,20 +554,20 @@ export default function MarshalPage() {
         </div>
       )}
 
-      {/* Tab 3: Gate Logs & Exits */}
+      {/* TAB 3: GATE LOGS & EXITS (Completed attendance records) */}
       {activeTab === 'exits' && (
         <div className="bg-white border border-[#E7E5E0] rounded-[12px] shadow-[0_1px_2px_rgba(20,23,26,0.04)] overflow-hidden">
           <div className="overflow-x-auto min-w-0">
-            <table className="w-full min-w-[720px] text-left text-xs border-collapse">
+            <table className="w-full min-w-[780px] text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-[#E7E5E0] bg-white h-11 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider select-none">
-                  <th className="px-4 py-2">VRN / Ref</th>
-                  <th className="px-4 py-2">Driver & Supplier</th>
-                  <th className="px-4 py-2">Site Offload Zone</th>
-                  <th className="px-4 py-2">Gate In</th>
-                  <th className="px-4 py-2">Gate Out</th>
-                  <th className="px-4 py-2">Turnaround Duration</th>
-                  <th className="px-4 py-2 text-right">Event Status</th>
+                  <th className="px-4 py-2">Booking ID</th>
+                  <th className="px-4 py-2">Site & Destination</th>
+                  <th className="px-4 py-2">Supplier & Driver</th>
+                  <th className="px-4 py-2">Material / Service</th>
+                  <th className="px-4 py-2">Vehicle / Unique ID</th>
+                  <th className="px-4 py-2">Entry & Exit Times</th>
+                  <th className="px-4 py-2 text-right">Status & Duration</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E7E5E0]">
@@ -500,10 +577,10 @@ export default function MarshalPage() {
                       <div className="flex flex-col items-center justify-center space-y-2">
                         <Clock className="w-8 h-8 text-[#9CA3AF] stroke-1" />
                         <span className="font-medium text-[#14171A]">
-                          No historical departures today
+                          No completed departures today
                         </span>
                         <p className="text-xs text-[#9CA3AF] max-w-sm">
-                          Completed visits and recorded security exceptions will appear in this audit log.
+                          Vehicles completing scan-out and recorded security exceptions appear in this audit log.
                         </p>
                       </div>
                     </td>
@@ -514,51 +591,60 @@ export default function MarshalPage() {
 
                     return (
                       <tr key={visit.id} className="h-14 hover:bg-[#F7F7F5] transition-colors">
+                        {/* Booking ID */}
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-mono font-semibold text-sm text-[#14171A] block">
-                            {visit.vehicleReg}
-                          </span>
-                          <span className="font-mono text-[11px] text-[#6B7280]">
+                          <span className="font-mono font-semibold text-xs text-[#14171A] block">
                             {visit.orderNumber}
+                          </span>
+                          <span className="text-[10px] font-mono text-[#6B7280]">
+                            {visit.id}
                           </span>
                         </td>
 
+                        {/* Site & Destination */}
                         <td className="px-4 py-3">
-                          <div className="font-medium text-[#14171A]">
+                          <div className="font-medium text-[#14171A] max-w-[200px] truncate">
+                            {visit.destinationName}
+                          </div>
+                          <div className="text-[11px] text-[#6B7280] truncate max-w-[180px]">
+                            {visit.siteName}
+                          </div>
+                        </td>
+
+                        {/* Supplier & Driver */}
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-[#14171A] truncate max-w-[170px]">
                             {visit.driverName || 'Driver'}
                           </div>
-                          <div className="text-[11px] text-[#9CA3AF]">
+                          <div className="text-[11px] text-[#6B7280] truncate max-w-[170px]">
                             {visit.supplierName}
                           </div>
                         </td>
 
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-[#14171A] max-w-[180px] truncate">
-                            {visit.destinationName}
-                          </div>
-                          <div className="text-[11px] text-[#9CA3AF] truncate max-w-[180px]">
-                            {visit.category}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280]">
-                          {visit.gateEntryAt ? formatDateTime(visit.gateEntryAt) : '—'}
-                        </td>
-
-                        <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280]">
-                          {visit.gateExitAt ? formatDateTime(visit.gateExitAt) : '—'}
-                        </td>
-
+                        {/* Material / Service */}
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {visit.durationMinutes ? (
-                            <span className="font-medium text-[#14171A] tabular-nums">
-                              {visit.durationMinutes} mins
-                            </span>
-                          ) : (
-                            <span className="text-[#9CA3AF]">Turnaround logged</span>
-                          )}
+                          <span className="font-semibold text-[#14171A] tabular-nums">
+                            {visit.orderedQty} {visit.unit}
+                          </span>
+                          <span className="text-[11px] text-[#6B7280] block max-w-[170px] truncate">
+                            {visit.category}
+                          </span>
                         </td>
 
+                        {/* Vehicle / Unique ID */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="font-mono font-semibold text-xs text-[#14171A] bg-[#F7F7F5] border border-[#E7E5E0] px-2 py-0.5 rounded-md inline-block">
+                            {visit.vehicleReg || 'REG-PENDING'}
+                          </span>
+                        </td>
+
+                        {/* Entry & Exit Times */}
+                        <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280] text-[11px]">
+                          <div>In: {visit.gateEntryAt ? formatDateTime(visit.gateEntryAt) : '—'}</div>
+                          <div>Out: {visit.gateExitAt ? formatDateTime(visit.gateExitAt) : '—'}</div>
+                        </td>
+
+                        {/* Status & Duration */}
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           {isFlagged ? (
                             <div className="text-right">
@@ -567,13 +653,18 @@ export default function MarshalPage() {
                                 <span>Flagged Exception</span>
                               </span>
                               {visit.marshalFlagReason && (
-                                <p className="text-[10px] text-[#DC2626] mt-0.5 max-w-[180px] truncate ml-auto">
+                                <p className="text-[10px] text-[#DC2626] mt-0.5 max-w-[200px] truncate ml-auto">
                                   {visit.marshalFlagReason}
                                 </p>
                               )}
                             </div>
                           ) : (
-                            <StatusBadge status={visit.status} size="sm" />
+                            <div className="text-right space-y-0.5">
+                              <StatusBadge status="completed" size="sm" />
+                              <span className="text-[11px] font-mono font-medium text-[#14171A] block">
+                                {visit.durationMinutes ? `${visit.durationMinutes} mins duration` : 'Turnaround logged'}
+                              </span>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -597,6 +688,13 @@ export default function MarshalPage() {
         visit={entryVisit}
         isOpen={Boolean(entryVisit)}
         onClose={() => setEntryVisit(null)}
+      />
+
+      <PresentGateQrModal
+        isOpen={isPresentQrOpen}
+        onClose={() => setIsPresentQrOpen(false)}
+        site={currentSite}
+        visits={gateFilteredVisits}
       />
     </div>
   );

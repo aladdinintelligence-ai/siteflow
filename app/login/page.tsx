@@ -54,23 +54,15 @@ const SEED_PERSONAS: SeedPersona[] = [
     role: 'marshal',
     name: 'Gary O\'Connor',
     email: 'gate1.marshal@djcivil.co.uk',
-    org: 'Battersea Gate 1 Security',
+    org: 'Chatham & Rochester Site Security',
     icon: ShieldCheck,
     desc: 'Gate clearance, expected visits, safety exception flags',
-  },
-  {
-    role: 'supervisor',
-    name: 'Raj Patel',
-    email: 'supervisor.patel@djcivil.co.uk',
-    org: 'Battersea Laydown 2B',
-    icon: ShieldAlert,
-    desc: 'Delivery quantity sign-off, shortage credit notes',
   },
   {
     role: 'analyst',
     name: 'Emma Richardson',
     email: 'analyst@djcivil.co.uk',
-    org: 'DJ Civil Sustainability',
+    org: 'DJ Civil Operations & Logistics',
     icon: BarChart3,
     desc: 'Turnaround duration histogram, SLA scorecard',
   },
@@ -256,7 +248,7 @@ function LoginForm() {
 
         <div className="bg-[#FEF3C7] text-[#B45309] rounded-lg p-3 text-[11px] leading-relaxed">
           <span className="font-semibold block mb-0.5">Role Scoping Rules:</span>
-          Drivers are firewalled from commercial pricing. Supervisors are restricted to discharge verification. Suppliers only see their own company orders.
+          Drivers are firewalled from commercial pricing. Marshals inspect and authorise gate bookings. Suppliers only see their own company orders.
         </div>
       </div>
     </div>

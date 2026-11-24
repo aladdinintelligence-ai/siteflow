@@ -91,8 +91,8 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
         </div>
       </div>
 
-      {/* PHASE 1: EN ROUTE - Approach Telematics & Primary Scan Action */}
-      {job.status === 'en_route' && (
+      {/* PHASE 1: EN ROUTE / SCHEDULED - Approach Telematics & Primary Scan Action */}
+      {(job.status === 'en_route' || job.status === 'scheduled') && (
         <div className="space-y-3 sm:space-y-4">
           {job.tracking && (
             <LiveTrackingCard
@@ -113,7 +113,30 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
         </div>
       )}
 
-      {/* PHASE 2 & 3: ON SITE - Entry Authorised & Route Map */}
+      {/* PHASE 2: AT GATE - QR Scanned, Awaiting Marshal Entry Authorisation */}
+      {job.status === 'at_gate' && (
+        <div className="space-y-3 sm:space-y-4">
+          <div className="bg-[#FFFFFF] border border-[#E7E5E0] rounded-[12px] p-4 shadow-[0_1px_2px_rgba(20,23,26,0.04)] space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#F5B301] animate-pulse" />
+                <span className="font-semibold text-[#14171A]">Checked in at gate</span>
+              </div>
+              <span className="text-[#6B7280] font-mono">{formatDateTime(job.gateEntryAt)}</span>
+            </div>
+            <p className="text-[#6B7280] leading-relaxed">
+              QR scan recorded at {job.gateName}. Traffic marshal Gary O&apos;Connor is matching vehicle{' '}
+              <strong className="text-[#14171A] font-mono">{job.vehicleReg}</strong> to the booking ledger.
+            </p>
+            <div className="p-2.5 bg-[#F7F7F5] rounded-lg text-[11px] text-[#4B5563] flex items-center gap-2 border border-[#E7E5E0]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />
+              <span>Awaiting marshal entry authorisation. Site route will unlock shortly.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PHASE 3: ON SITE - Entry Authorised, Booking-Specific Route Map & Direct Scan Out */}
       {job.status === 'on_site' && (
         <div className="space-y-3 sm:space-y-4">
           {/* Calm Status Confirmation */}
@@ -125,7 +148,7 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
             <span className="text-[#6B7280] font-mono">{formatDateTime(job.gateEntryAt)}</span>
           </div>
 
-          {/* Site Route Plan */}
+          {/* Booking-Specific Site Route Plan */}
           <SitePlan
             site={site}
             activeGateId={job.gateId}
@@ -133,30 +156,13 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
             isDriverNavigating={true}
           />
 
-          {/* Subdued supervisor notice */}
-          <div className="p-3 sm:p-4 bg-[#FFFFFF] border border-[#E7E5E0] rounded-[12px] text-xs text-[#6B7280] shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
-            <span className="font-medium text-[#14171A] block mb-0.5">
-              Awaiting delivery verification
+          {/* Operational Guidance */}
+          <div className="p-3 sm:p-4 bg-[#FFFFFF] border border-[#E7E5E0] rounded-[12px] text-xs text-[#6B7280] shadow-[0_1px_2px_rgba(20,23,26,0.04)] space-y-1">
+            <span className="font-medium text-[#14171A] block">
+              Direct Route to {job.destinationName}
             </span>
-            Please offload at {job.destinationName}. The receiving supervisor will sign off the actual
-            quantity on their tablet.
-          </div>
-        </div>
-      )}
-
-      {/* PHASE 4: VERIFIED - Supervisor Signed Off, Ready to Scan Out */}
-      {job.status === 'verified' && (
-        <div className="space-y-3 sm:space-y-4">
-          <div className="bg-[#FFFFFF] border border-[#E7E5E0] rounded-[12px] p-4 shadow-[0_1px_2px_rgba(20,23,26,0.04)] space-y-1 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-[#16A34A] flex items-center gap-1.5">
-                <Check className="w-4 h-4" />
-                Delivery verified
-              </span>
-              <span className="text-[#6B7280] font-mono">{formatDateTime(job.verifiedAt)}</span>
-            </div>
-            <p className="text-[#6B7280]">
-              Supervisor sign-off confirmed. Proceed to gate exit.
+            <p>
+              Offload at designated zone. When work is complete, proceed to site gate exit to record visit completion.
             </p>
           </div>
 

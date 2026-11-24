@@ -54,7 +54,13 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
             (decodedText) => {
               if (isMounted) {
                 setScanMatched(true);
-                scanner.stop().catch(() => {});
+                try {
+                  if (scanner.isScanning) {
+                    scanner.stop().catch(() => {});
+                  }
+                } catch {
+                  // Ignore scanner stop state errors
+                }
                 setTimeout(() => {
                   onScanSuccess(decodedText);
                 }, 800);
@@ -64,7 +70,18 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
               // Frame scan error (normal while searching for QR)
             }
           );
-          if (isMounted) setCameraActive(true);
+          if (isMounted) {
+            setCameraActive(true);
+          } else {
+            // Unmounted while starting
+            try {
+              if (scanner.isScanning) {
+                scanner.stop().catch(() => {}).finally(() => {
+                  try { scanner.clear(); } catch {}
+                });
+              }
+            } catch {}
+          }
         } else {
           if (isMounted) setErrorMsg('No physical camera detected. You can use manual entry or simulation below.');
         }
@@ -79,8 +96,19 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
 
     return () => {
       isMounted = false;
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
+      const scanner = scannerRef.current;
+      if (scanner) {
+        try {
+          if (scanner.isScanning) {
+            scanner.stop().catch(() => {}).finally(() => {
+              try { scanner.clear(); } catch {}
+            });
+          } else {
+            try { scanner.clear(); } catch {}
+          }
+        } catch {
+          // Suppress synchronous "Cannot stop, scanner is not running or paused"
+        }
       }
     };
   }, [onScanSuccess]);

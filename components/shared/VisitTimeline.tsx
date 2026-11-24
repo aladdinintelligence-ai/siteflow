@@ -9,12 +9,22 @@ interface VisitTimelineProps {
   compact?: boolean;
 }
 
+interface TimelineStep {
+  key: string;
+  label: string;
+  sublabel: string;
+  timestamp: string | undefined;
+  isDone: boolean;
+  isCurrent: boolean;
+  discrepancy?: boolean;
+}
+
 export const VisitTimeline: React.FC<VisitTimelineProps> = ({
   visit,
   order,
   compact = false,
 }) => {
-  const steps = [
+  const steps: TimelineStep[] = [
     {
       key: 'ordered',
       label: 'Ordered',
@@ -46,26 +56,25 @@ export const VisitTimeline: React.FC<VisitTimelineProps> = ({
     {
       key: 'gate_in',
       label: 'Gate in',
-      sublabel: 'Auto QR',
+      sublabel: 'QR Scanned',
       timestamp: visit?.gateEntryAt,
       isDone: Boolean(visit?.gateEntryAt),
-      isCurrent: visit?.status === 'on_site',
+      isCurrent: visit?.status === 'at_gate',
     },
     {
-      key: 'verified',
-      label: 'Verified',
-      sublabel: visit?.discrepancy ? `${visit.discrepancy.varianceQty} ${visit.unit}` : 'Received',
-      timestamp: visit?.verifiedAt,
-      isDone: Boolean(visit?.verifiedAt),
-      isCurrent: visit?.status === 'verified' && !visit?.gateExitAt,
-      discrepancy: Boolean(visit?.discrepancy),
+      key: 'on_site',
+      label: 'On site',
+      sublabel: visit?.entryAuthorised ? 'Authorised' : 'Pending Gate',
+      timestamp: visit?.gateEntryAt,
+      isDone: ['on_site', 'verified', 'completed'].includes(visit?.status || ''),
+      isCurrent: visit?.status === 'on_site',
     },
     {
       key: 'gate_out',
       label: 'Gate out',
-      sublabel: visit?.durationMinutes ? `${visit.durationMinutes}m` : 'Exit',
+      sublabel: visit?.durationMinutes ? `${visit.durationMinutes}m turnaround` : 'Complete',
       timestamp: visit?.gateExitAt,
-      isDone: Boolean(visit?.gateExitAt),
+      isDone: visit?.status === 'completed' || Boolean(visit?.gateExitAt),
       isCurrent: false,
     },
   ];

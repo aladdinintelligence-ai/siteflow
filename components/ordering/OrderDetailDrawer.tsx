@@ -84,9 +84,15 @@ export const OrderDetailDrawer: React.FC<OrderDetailDrawerProps> = ({
                 </span>
               </div>
               <div className="flex justify-between">
+                <span className="text-[#6B7280]">Vehicle reg / Unique ID</span>
+                <span className="font-mono font-medium text-[#14171A]">
+                  {visit?.vehicleReg || order.vehicleReg || 'Unassigned'}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-[#6B7280]">Assigned haulier / driver</span>
                 <span className="font-medium text-[#14171A]">
-                  {visit?.driverName ? `${visit.driverName} (${visit.vehicleReg})` : 'Pending allocation'}
+                  {visit?.driverName ? `${visit.driverName} (${visit.vehicleReg || order.vehicleReg})` : 'Pending allocation'}
                 </span>
               </div>
             </div>

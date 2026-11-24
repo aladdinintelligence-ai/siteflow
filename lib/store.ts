@@ -59,6 +59,7 @@ export interface AppState {
   startJourney: (visitId: string) => void;
   toggleDriverTrackingConsent: (visitId: string, consent: boolean) => void;
   scanIn: (visitId: string, gateId?: string) => void;
+  marshalAuthoriseEntry: (visitId: string, notes?: string) => void;
   marshalFlagException: (visitId: string, reason: string) => void;
   verifyDelivery: (
     visitId: string,
@@ -80,7 +81,7 @@ export const useAppStore = create<AppState>()(
       drivers: SEED_DRIVERS,
 
       currentRole: 'driver',
-      currentSiteId: 'site-btr',
+      currentSiteId: 'site-chatham',
       activeDriverId: 'drv-dave',
       activeSupplierId: 'sup-cemex',
       toast: null,
@@ -137,6 +138,7 @@ export const useAppStore = create<AppState>()(
           timeSlot: orderInput.timeSlot,
           unitPrice: orderInput.unitPrice,
           commercialTerms: orderInput.commercialTerms,
+          vehicleReg: orderInput.vehicleReg,
         }).catch((err) => console.warn('[Backend Sync]', err.message));
 
         showToast(`Order ${orderNumber} created & sent to ${newOrder.supplierName}`);
@@ -163,9 +165,10 @@ export const useAppStore = create<AppState>()(
             siteName: order.siteName,
             supplierId: order.supplierId,
             supplierName: supplier?.name || order.supplierName,
-            gateId: site?.gates[0]?.id || 'gate-btr-1',
+            gateId: site?.gates[0]?.id || 'gate-chatham-1',
             destinationId: order.destinationId,
             destinationName: order.destinationName,
+            vehicleReg: order.vehicleReg,
             type: order.type,
             category: order.category,
             description: order.description,
@@ -203,7 +206,7 @@ export const useAppStore = create<AppState>()(
         const { orders, visits, drivers, sites, showToast } = get();
         const order = orders.find((o) => o.id === orderId);
         const driver = drivers.find((d) => d.id === driverId);
-        const reg = vehicleReg || driver?.defaultVehicleReg || 'REG-UNASSIGNED';
+        const reg = vehicleReg || order?.vehicleReg || driver?.defaultVehicleReg || 'REG-UNASSIGNED';
 
         const updatedOrders = orders.map((o) =>
           o.id === orderId ? { ...o, status: 'dispatched' as OrderStatus } : o
@@ -249,7 +252,7 @@ export const useAppStore = create<AppState>()(
             driverId,
             driverName: driver?.name || 'Assigned Driver',
             vehicleReg: reg,
-            gateId: site?.gates[0]?.id || 'gate-btr-1',
+            gateId: site?.gates[0]?.id || 'gate-chatham-1',
             destinationId: order.destinationId,
             destinationName: order.destinationName,
             type: order.type,
@@ -333,25 +336,20 @@ export const useAppStore = create<AppState>()(
               ? {
                   ...v,
                   gateId: gateId || v.gateId,
-                  status: 'on_site',
-                  entryAuthorised: true,
-                  entryAuthorisedBy: 'Auto QR Validation',
-                  entryMethod: 'qr_auto',
+                  status: 'at_gate',
+                  entryAuthorised: false,
                   gateEntryAt: now,
                   tracking: v.tracking
                     ? {
                         ...v.tracking,
                         distanceRemainingKm: 0,
                         estimatedArrivalMinutes: 0,
-                        currentLocationName: 'On Site - Authorized at Gate',
+                        currentLocationName: 'At Gate - Awaiting Clearance',
                         lastPingAt: now,
                       }
                     : undefined,
                 }
               : v
-          ),
-          orders: state.orders.map((o) =>
-            o.id === targetVisit?.orderId ? { ...o, status: 'on_site' } : o
           ),
         }));
 
@@ -362,7 +360,48 @@ export const useAppStore = create<AppState>()(
           orderNumber: targetVisit?.orderNumber,
         }).catch((err) => console.warn('[Backend Sync]', err.message));
 
-        get().showToast(`Booking retrieved: Gate entry authorised for ${targetVisit?.orderNumber || 'visit'}`);
+        get().showToast(`Gate QR scanned: ${targetVisit?.vehicleReg || targetVisit?.orderNumber || 'Driver'} checked in. Awaiting marshal authorisation.`);
+      },
+
+      marshalAuthoriseEntry: (visitId, notes) => {
+        const now = new Date().toISOString();
+        const targetVisit = get().visits.find((v) => v.id === visitId);
+        if (!targetVisit) return;
+
+        set((state) => ({
+          visits: state.visits.map((v) =>
+            v.id === visitId
+              ? {
+                  ...v,
+                  status: 'on_site',
+                  entryAuthorised: true,
+                  entryAuthorisedBy: "Gary O'Connor (Traffic Marshal)",
+                  entryMethod: 'marshal_manual',
+                  gateEntryAt: v.gateEntryAt || now,
+                  tracking: v.tracking
+                    ? {
+                        ...v.tracking,
+                        distanceRemainingKm: 0,
+                        estimatedArrivalMinutes: 0,
+                        currentLocationName: `On Site - Heading to ${v.destinationName}`,
+                        lastPingAt: now,
+                      }
+                    : undefined,
+                }
+              : v
+          ),
+          orders: state.orders.map((o) =>
+            o.id === targetVisit.orderId ? { ...o, status: 'on_site' } : o
+          ),
+        }));
+
+        api.gate.authoriseEntry({
+          visitId,
+          gateId: targetVisit.gateId,
+          orderNumber: targetVisit.orderNumber,
+        }).catch((err) => console.warn('[Backend Sync]', err.message));
+
+        get().showToast(`Gate entry authorised: ${targetVisit.vehicleReg || targetVisit.orderNumber} cleared for ${targetVisit.destinationName}`);
       },
 
       marshalFlagException: (visitId, reason) => {
@@ -489,7 +528,9 @@ export const useAppStore = create<AppState>()(
           orderNumber: targetVisit.orderNumber,
         }).catch((err) => console.warn('[Backend Sync]', err.message));
 
-        get().showToast(`Visit completed: ${duration}m turnaround duration logged`);
+        get().showToast(
+          `Visit completed: ${duration}m turnaround duration logged for ${targetVisit.vehicleReg || targetVisit.orderNumber}`
+        );
       },
     }),
     {

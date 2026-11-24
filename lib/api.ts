@@ -179,6 +179,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    authoriseEntry: (data: { visitId: string; gateId?: string; orderNumber?: string }) =>
+      apiRequest('/gate/authorise-entry', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 
   // Verification & Supervisor

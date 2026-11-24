@@ -62,16 +62,6 @@ export const ROLES: Record<RoleId, RoleConfig> = {
     allowedDataDescription: 'Gate bookings for today, vehicle registrations, driver names, entry/exit timestamps.',
     iconName: 'ShieldCheck',
   },
-  supervisor: {
-    id: 'supervisor',
-    name: 'Receiving Supervisor',
-    badge: 'Quality Sign-Off',
-    deviceFocus: 'tablet',
-    path: '/supervisor',
-    description: 'Verify received quantity against dispatched, log shortages or damaged items, certify services.',
-    allowedDataDescription: 'Dispatched volume vs received volume, quality sign-off, discrepancy logging.',
-    iconName: 'CheckCircle2',
-  },
   analyst: {
     id: 'analyst',
     name: 'Data Analyst',
