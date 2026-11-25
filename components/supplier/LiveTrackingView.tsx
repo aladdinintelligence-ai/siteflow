@@ -392,3 +392,4 @@ export const LiveTrackingView: React.FC<LiveTrackingViewProps> = ({ initialLoadI
     </div>
   );
 };
+

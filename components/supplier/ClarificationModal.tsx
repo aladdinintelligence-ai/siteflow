@@ -124,3 +124,4 @@ export const ClarificationModal: React.FC<ClarificationModalProps> = ({
     </div>
   );
 };
+

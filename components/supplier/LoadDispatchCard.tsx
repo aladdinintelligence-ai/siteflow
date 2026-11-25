@@ -263,3 +263,4 @@ export const LoadDispatchCard: React.FC<LoadDispatchCardProps> = ({ load, onTrac
     </>
   );
 };
+

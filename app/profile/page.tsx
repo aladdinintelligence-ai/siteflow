@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useAuth } from '@/context/AuthContext';
 import { UserProfile, RoleId } from '@/lib/types';
@@ -22,20 +22,31 @@ import Link from 'next/link';
 import { ROLE_HOME_PATHS } from '@/context/AuthContext';
 
 export default function ProfilePage() {
-  const { userProfiles, updateUserProfile, currentRole } = useAppStore();
+  const { userProfiles, updateUserProfile, currentRole, showToast } = useAppStore();
   const { user: authUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveRole: RoleId = (authUser?.role as RoleId) || currentRole || 'manager';
   const profile: UserProfile = userProfiles[effectiveRole] || userProfiles.manager;
 
-  const [name, setName] = useState(profile.name);
-  const [phone, setPhone] = useState(profile.phone);
+  const [name, setName] = useState(profile.name || authUser?.name || 'SiteFlow User');
+  const [phone, setPhone] = useState(profile.phone || '');
   const [radioChannel, setRadioChannel] = useState(profile.radioChannel || '');
   const [cscsNumber, setCscsNumber] = useState(profile.cscsNumber || '');
   const [vehicleReg, setVehicleReg] = useState(profile.vehicleReg || '');
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl || '');
   const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || authUser?.name || '');
+      setPhone(profile.phone || '');
+      setRadioChannel(profile.radioChannel || '');
+      setCscsNumber(profile.cscsNumber || '');
+      setVehicleReg(profile.vehicleReg || '');
+      setAvatarUrl(profile.avatarUrl || '');
+    }
+  }, [profile, effectiveRole, authUser]);
 
   const homePath = ROLE_HOME_PATHS[effectiveRole] || '/';
 
@@ -49,6 +60,7 @@ export default function ProfilePage() {
       if (dataUrl) {
         setAvatarUrl(dataUrl);
         updateUserProfile(effectiveRole, { avatarUrl: dataUrl });
+        showToast('Profile picture updated.');
       }
     };
     reader.readAsDataURL(file);
@@ -65,9 +77,10 @@ export default function ProfilePage() {
       avatarUrl,
     });
     setIsSaved(true);
+    showToast('Profile & credentials saved successfully.');
     setTimeout(() => {
       setIsSaved(false);
-    }, 1500);
+    }, 2000);
   };
 
   return (
@@ -133,7 +146,7 @@ export default function ProfilePage() {
               </div>
               <p className="text-xs text-[#6B7280] flex items-center gap-1.5">
                 <Building className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
-                <span className="truncate">{profile.organization}</span>
+                <span className="truncate">{authUser?.organization || profile.organization}</span>
               </p>
               <p className="text-[11px] text-[#4B5563] font-medium">
                 {profile.jobTitle || 'Site Operational Handler'}
@@ -189,7 +202,7 @@ export default function ProfilePage() {
                   <Mail className="w-3.5 h-3.5 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
-                    value={profile.email}
+                    value={authUser?.email || profile.email}
                     disabled
                     className="w-full h-9 pl-8 pr-3 bg-[#F8F8F6] border border-[#E7E5E0] rounded-lg text-xs text-[#6B7280] cursor-not-allowed"
                   />

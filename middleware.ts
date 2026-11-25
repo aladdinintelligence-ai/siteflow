@@ -11,6 +11,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/marshal': ['marshal', 'manager', 'director'],
   '/analyst': ['analyst', 'manager', 'director'],
   '/discovery': ['manager', 'director'],
+  '/profile': ['manager', 'director', 'ordering', 'supplier', 'driver', 'marshal', 'analyst'],
 };
 
 const ROLE_DEFAULT_PATHS: Record<string, string> = {
