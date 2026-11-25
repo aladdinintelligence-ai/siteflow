@@ -150,9 +150,70 @@ export interface LiveTrackingData {
   disclaimer: string;
 }
 
+export interface OrderLine {
+  id: string;
+  category: string;
+  description: string;
+  requestedQty: number;
+  unit: string;
+  estimatedLoads?: number;
+}
+
+export interface Vehicle {
+  id: string;
+  supplierId: string;
+  registration: string;
+  type: string;
+  capacity: number;
+  capacityUnit: string;
+  status: 'available' | 'in_transit' | 'maintenance';
+}
+
+export type LoadStatus =
+  | 'pending_assignment'
+  | 'assigned'
+  | 'dispatched'
+  | 'at_gate'
+  | 'on_site'
+  | 'completed'
+  | 'cancelled';
+
+export interface DeliveryLoad {
+  id: string;
+  loadNumber: string; // e.g. LD-1024-A
+  orderId: string;
+  orderNumber: string;
+  orderLineId?: string;
+  customerName: string;
+  siteId: string;
+  siteName: string;
+  destinationId: string;
+  destinationName: string;
+  supplierId: string;
+  material: string;
+  quantity: number;
+  unit: string;
+  driverId?: string;
+  driverName?: string;
+  vehicleReg?: string;
+  vehicleCapacity?: number;
+  vehicleType?: string;
+  status: LoadStatus;
+  dispatchedAt?: string;
+  estimatedArrivalMinutes?: number;
+  gateEntryAt?: string;
+  gateExitAt?: string;
+  durationMinutes?: number;
+  tracking?: LiveTrackingData;
+  qrCode?: string;
+  clarificationNotes?: string;
+}
+
 export interface Order {
   id: string;
-  orderNumber: string; // e.g. DJ-2026-0842
+  orderNumber: string; // e.g. DJ-2026-0842 or #SF-1024
+  customerName?: string; // e.g. DJ Civils Ltd
+  orderedBy?: string; // e.g. Chris (Site Manager)
   siteId: string;
   siteName: string;
   supplierId: string;
@@ -161,7 +222,11 @@ export interface Order {
   category: string; // Concrete, Aggregates, Rebar, Waste, Plant Hire, Service
   description: string;
   orderedQty: number;
-  unit: string; // tonnes, m3, loads, units, hours
+  unit: string; // tonnes, m3, loads, units, hours, litres, visits
+  lines?: OrderLine[];
+  estimatedLoads?: number;
+  clarificationRequested?: boolean;
+  clarificationNotes?: string;
   destinationId: string;
   destinationName: string;
   vehicleReg?: string; // Vehicle registration or unique identification

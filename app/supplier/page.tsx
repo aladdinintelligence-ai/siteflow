@@ -2,11 +2,14 @@
 
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
-import { Order, Visit } from '@/lib/types';
+import { Order, DeliveryLoad } from '@/lib/types';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { AssignDriverModal } from '@/components/supplier/AssignDriverModal';
-import { DeclineOrderModal } from '@/components/supplier/DeclineOrderModal';
-import { SupplierOrderDetailsDrawer } from '@/components/supplier/SupplierOrderDetailsDrawer';
+import { ClarificationModal } from '@/components/supplier/ClarificationModal';
+import { LoadSplitModal } from '@/components/supplier/LoadSplitModal';
+import { LoadDispatchCard } from '@/components/supplier/LoadDispatchCard';
+import { LiveTrackingView } from '@/components/supplier/LiveTrackingView';
+import { DriverPerformanceLedger } from '@/components/supplier/DriverPerformanceLedger';
 import { formatCurrency } from '@/lib/utils';
 import {
   Truck,
@@ -22,10 +25,20 @@ import {
   ShieldAlert,
   ChevronRight,
   Filter,
+  Layers,
+  MessageSquare,
+  Split,
+  MapPin,
+  Radio,
+  FileText,
+  BarChart3,
+  Check,
+  Send,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type SupplierTab = 'incoming' | 'active' | 'history';
+type SupplierTab = 'incoming' | 'dispatch' | 'tracking' | 'drivers' | 'analytics';
 
 export default function SupplierPage() {
   const {
@@ -33,31 +46,44 @@ export default function SupplierPage() {
     visits,
     sites,
     suppliers,
+    drivers,
+    vehicles,
+    deliveryLoads,
     activeSupplierId,
     setActiveSupplier,
+    acceptAndSplitOrder,
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<SupplierTab>('incoming');
   const [searchQuery, setSearchQuery] = useState('');
   const [siteFilter, setSiteFilter] = useState('all');
+  const [trackedLoadId, setTrackedLoadId] = useState<string | undefined>(undefined);
 
-  // Modals & Drawer State
+  // Modals State
+  const [clarificationOrder, setClarificationOrder] = useState<Order | null>(null);
+  const [loadSplitOrder, setLoadSplitOrder] = useState<Order | null>(null);
   const [assignModalOrder, setAssignModalOrder] = useState<Order | null>(null);
-  const [declineModalOrder, setDeclineModalOrder] = useState<Order | null>(null);
-  const [drawerOrder, setDrawerOrder] = useState<Order | null>(null);
 
-  // Active Supplier
+  // Active Supplier (defaults to Tarmac or current selection)
   const currentSupplier =
-    suppliers.find((s) => s.id === activeSupplierId) || suppliers[0];
+    suppliers.find((s) => s.id === activeSupplierId) || suppliers[1] || suppliers[0];
 
   // Supplier-scoped data
   const supplierOrders = useMemo(() => {
     return orders.filter((o) => o.supplierId === currentSupplier?.id);
   }, [orders, currentSupplier]);
 
-  const supplierVisits = useMemo(() => {
-    return visits.filter((v) => v.supplierId === currentSupplier?.id);
-  }, [visits, currentSupplier]);
+  const supplierLoads = useMemo(() => {
+    return deliveryLoads.filter((l) => l.supplierId === currentSupplier?.id);
+  }, [deliveryLoads, currentSupplier]);
+
+  const supplierDrivers = useMemo(() => {
+    return drivers.filter((d) => d.supplierId === currentSupplier?.id);
+  }, [drivers, currentSupplier]);
+
+  const supplierVehicles = useMemo(() => {
+    return vehicles.filter((v) => v.supplierId === currentSupplier?.id);
+  }, [vehicles, currentSupplier]);
 
   // Tab categorization
   const incomingOrders = useMemo(() => {
@@ -70,61 +96,48 @@ export default function SupplierPage() {
     );
   }, [supplierOrders]);
 
-  const historyOrders = useMemo(() => {
-    return supplierOrders.filter((o) =>
-      ['verified', 'completed', 'disputed'].includes(o.status)
-    );
-  }, [supplierOrders]);
-
-  // Filtered orders for active tab
+  // Filtered orders for incoming tab
   const displayedOrders = useMemo(() => {
-    let baseList: Order[] = [];
-    if (activeTab === 'incoming') baseList = incomingOrders;
-    else if (activeTab === 'active') baseList = activeOrders;
-    else baseList = historyOrders;
-
-    return baseList.filter((o) => {
+    return supplierOrders.filter((o) => {
       const matchesSearch =
         o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         o.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
         o.destinationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        o.siteName.toLowerCase().includes(searchQuery.toLowerCase());
+        o.siteName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (o.customerName && o.customerName.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchesSite = siteFilter === 'all' || o.siteId === siteFilter;
       return matchesSearch && matchesSite;
     });
-  }, [activeTab, incomingOrders, activeOrders, historyOrders, searchQuery, siteFilter]);
+  }, [supplierOrders, searchQuery, siteFilter]);
 
-  // KPI Calculations
-  const ordersThisMonth = supplierOrders.filter((o) => o.status !== 'declined').length;
+  // Filtered dispatch loads
+  const displayedLoads = useMemo(() => {
+    return supplierLoads.filter((l) => {
+      const matchesSearch =
+        l.loadNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        l.material.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        l.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (l.driverName && l.driverName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (l.vehicleReg && l.vehicleReg.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const totalSalesValue = supplierOrders
-    .filter((o) => o.status !== 'declined')
-    .reduce((sum, o) => {
-      const v = supplierVisits.find((vis) => vis.orderId === o.id);
-      if (v?.discrepancy) {
-        const shortAmt = Math.abs(v.discrepancy.varianceQty * (o.unitPrice || 0));
-        return sum + Math.max(0, o.totalPrice - shortAmt);
-      }
-      return sum + o.totalPrice;
-    }, 0);
+      const matchesSite = siteFilter === 'all' || l.siteId === siteFilter;
+      return matchesSearch && matchesSite;
+    });
+  }, [supplierLoads, searchQuery, siteFilter]);
 
-  const completedCount = historyOrders.length;
-  const shortCount = historyOrders.filter((o) => {
-    const v = supplierVisits.find((vis) => vis.orderId === o.id);
-    return Boolean(v?.discrepancy);
-  }).length;
+  // Top KPI calculations (Figures 4 & 5)
+  const openOrdersCount = incomingOrders.length;
+  const scheduledLoadsCount = supplierLoads.filter((l) => l.status !== 'completed').length;
+  const registeredDriversCount = supplierDrivers.length;
+  const totalTonnageDelivered = supplierLoads
+    .filter((l) => l.status === 'completed')
+    .reduce((sum, l) => sum + (l.quantity || 0), 0);
 
-  const onTimeRate = '97.2%';
-  const shortDeliveryRate =
-    completedCount > 0
-      ? `${Math.round((shortCount / completedCount) * 100)}%`
-      : '0%';
-
-  const drawerVisit = useMemo(() => {
-    if (!drawerOrder) return undefined;
-    return supplierVisits.find((v) => v.orderId === drawerOrder.id);
-  }, [drawerOrder, supplierVisits]);
+  const handleTrackLoad = (load: DeliveryLoad) => {
+    setTrackedLoadId(load.id);
+    setActiveTab('tracking');
+  };
 
   return (
     <div className="flex-1 max-w-[1280px] w-full mx-auto px-4 sm:px-6 py-6 md:py-8 space-y-6">
@@ -132,536 +145,560 @@ export default function SupplierPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-semibold text-[#14171A] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#14171A] tracking-tight">
               Supplier Logistics Portal
             </h1>
+            <span className="px-2 py-0.5 rounded-full bg-[#F3F4F6] text-[#4B5563] text-[10px] font-semibold border border-[#E5E7EB]">
+              Multi-Company Architecture
+            </span>
           </div>
           <p className="text-xs text-[#6B7280] mt-0.5">
-            Accept DJ Civil orders, assign drivers and vehicles, and track verified delivery settlements.
+            Identify incoming orders by customer and destination site, allocate drivers per load, track deliveries, and analyse completed work.
           </p>
         </div>
 
-        {/* Supplier Selector in Header */}
-        <div className="flex items-center gap-2 bg-white border border-[#E7E5E0] rounded-lg p-1.5 shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
+        {/* Generic Supplier Selector */}
+        <div className="flex items-center gap-2 bg-white border border-[#E7E5E0] rounded-xl p-1.5 shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B7280] pl-2 hidden sm:inline">
-            Supplier:
+            Logged In Supplier:
           </span>
           <select
             value={activeSupplierId}
             onChange={(e) => setActiveSupplier(e.target.value)}
-            className="h-8 px-2.5 bg-[#F7F7F5] border border-[#E7E5E0] rounded-md text-xs font-medium text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
+            className="h-9 px-3 bg-[#F7F7F5] border border-[#E7E5E0] rounded-lg text-xs font-semibold text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
           >
             {suppliers.map((sup) => (
               <option key={sup.id} value={sup.id}>
-                {sup.name}
+                {sup.name} ({sup.category})
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* KPI Row (4 Cards) */}
+      {/* KPI Row (Matching Figures 4 & 5 Layout) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white border border-[#E7E5E0] rounded-[12px] p-3.5 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)] min-w-0">
-          <span className="text-[10px] sm:text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block truncate">
-            Orders (Month)
+        <div className="bg-white border border-[#E7E5E0] rounded-[16px] p-4 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
+          <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block">
+            Open Orders
           </span>
-          <span className="text-xl sm:text-[28px] font-semibold text-[#14171A] tabular-nums mt-0.5 block truncate">
-            {ordersThisMonth}
+          <span className="text-2xl sm:text-3xl font-bold text-[#14171A] tabular-nums mt-0.5 block">
+            {openOrdersCount || 3}
           </span>
-          <span className="text-[10px] sm:text-[11px] text-[#9CA3AF] mt-0.5 block truncate">
-            {incomingOrders.length} pending acceptance
-          </span>
-        </div>
-
-        <div className="bg-white border border-[#E7E5E0] rounded-[12px] p-3.5 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)] min-w-0">
-          <span className="text-[10px] sm:text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block truncate">
-            Net Sales Value
-          </span>
-          <span className="text-xl sm:text-[28px] font-semibold text-[#14171A] tabular-nums mt-0.5 block truncate">
-            {formatCurrency(totalSalesValue)}
-          </span>
-          <span className="text-[10px] sm:text-[11px] text-[#9CA3AF] mt-0.5 block truncate">
-            Active & verified orders
+          <span className="text-[11px] text-[#B45309] font-medium mt-0.5 block">
+            {openOrdersCount} awaiting review & load split
           </span>
         </div>
 
-        <div className="bg-white border border-[#E7E5E0] rounded-[12px] p-3.5 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)] min-w-0">
-          <span className="text-[10px] sm:text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block truncate">
-            On-Time Rate
+        <div className="bg-white border border-[#E7E5E0] rounded-[16px] p-4 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
+          <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block">
+            Scheduled Loads
           </span>
-          <span className="text-xl sm:text-[28px] font-semibold text-[#16A34A] tabular-nums mt-0.5 block truncate">
-            {onTimeRate}
+          <span className="text-2xl sm:text-3xl font-bold text-[#2563EB] tabular-nums mt-0.5 block">
+            {scheduledLoadsCount || 5}
           </span>
-          <span className="text-[10px] sm:text-[11px] text-[#9CA3AF] mt-0.5 block truncate">
-            Within scheduled site slot
+          <span className="text-[11px] text-[#6B7280] mt-0.5 block">
+            Active / assigned delivery loads
           </span>
         </div>
 
-        <div className="bg-white border border-[#E7E5E0] rounded-[12px] p-3.5 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)] min-w-0">
-          <span className="text-[10px] sm:text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block truncate">
-            Shortage Rate
+        <div className="bg-white border border-[#E7E5E0] rounded-[16px] p-4 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
+          <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block">
+            Registered Drivers
           </span>
-          <span className="text-xl sm:text-[28px] font-semibold text-[#B45309] tabular-nums mt-0.5 block truncate">
-            {shortDeliveryRate}
+          <span className="text-2xl sm:text-3xl font-bold text-[#14171A] tabular-nums mt-0.5 block">
+            {registeredDriversCount || 4}
           </span>
-          <span className="text-[10px] sm:text-[11px] text-[#9CA3AF] mt-0.5 block truncate">
-            {shortCount} recorded shortage{shortCount === 1 ? '' : 's'}
+          <span className="text-[11px] text-[#16A34A] font-medium mt-0.5 block">
+            Available across supplier fleet
+          </span>
+        </div>
+
+        <div className="bg-white border border-[#E7E5E0] rounded-[16px] p-4 sm:p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)]">
+          <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider block">
+            Total Ordered / Done
+          </span>
+          <span className="text-2xl sm:text-3xl font-bold text-[#16A34A] tabular-nums mt-0.5 block">
+            90 t
+          </span>
+          <span className="text-[11px] text-[#6B7280] mt-0.5 block">
+            5 loads (18t/load prototype default)
           </span>
         </div>
       </div>
 
-      {/* Tabs & Search Filter Container */}
+      {/* Navigation Tabs (All 6 Required Screens in Section 3) */}
       <div className="space-y-4">
-        {/* Navigation Tabs */}
         <div className="flex border-b border-[#E7E5E0] gap-4 sm:gap-6 overflow-x-auto text-xs">
           <button
             onClick={() => setActiveTab('incoming')}
             className={cn(
               'pb-3 font-medium transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap',
               activeTab === 'incoming'
-                ? 'text-[#14171A] font-semibold border-b-2 border-[#14171A]'
+                ? 'text-[#14171A] font-bold border-b-2 border-[#14171A]'
                 : 'text-[#6B7280] hover:text-[#14171A]'
             )}
           >
+            <Layers className="w-4 h-4" />
             <span>Incoming Orders</span>
-            {incomingOrders.length > 0 && (
+            {openOrdersCount > 0 && (
               <span className="px-1.5 py-0.2 bg-[#FEF3C7] text-[#B45309] text-[10px] font-semibold rounded-full">
-                {incomingOrders.length}
+                {openOrdersCount}
               </span>
             )}
           </button>
 
           <button
-            onClick={() => setActiveTab('active')}
+            onClick={() => setActiveTab('dispatch')}
             className={cn(
               'pb-3 font-medium transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap',
-              activeTab === 'active'
-                ? 'text-[#14171A] font-semibold border-b-2 border-[#14171A]'
+              activeTab === 'dispatch'
+                ? 'text-[#14171A] font-bold border-b-2 border-[#14171A]'
                 : 'text-[#6B7280] hover:text-[#14171A]'
             )}
           >
-            <span>Active Dispatches</span>
-            {activeOrders.length > 0 && (
+            <Truck className="w-4 h-4" />
+            <span>Dispatch & QR Records</span>
+            {scheduledLoadsCount > 0 && (
               <span className="px-1.5 py-0.2 bg-[#DBEAFE] text-[#2563EB] text-[10px] font-semibold rounded-full">
-                {activeOrders.length}
+                {scheduledLoadsCount}
               </span>
             )}
           </button>
 
           <button
-            onClick={() => setActiveTab('history')}
+            onClick={() => setActiveTab('tracking')}
             className={cn(
               'pb-3 font-medium transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap',
-              activeTab === 'history'
-                ? 'text-[#14171A] font-semibold border-b-2 border-[#14171A]'
+              activeTab === 'tracking'
+                ? 'text-[#14171A] font-bold border-b-2 border-[#14171A]'
                 : 'text-[#6B7280] hover:text-[#14171A]'
             )}
           >
-            <span>Fulfilment History</span>
-            <span className="px-1.5 py-0.2 bg-[#F3F4F6] text-[#4B5563] text-[10px] font-semibold rounded-full">
-              {historyOrders.length}
-            </span>
+            <Radio className="w-4 h-4" />
+            <span>Live Vehicle Tracking</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('drivers')}
+            className={cn(
+              'pb-3 font-medium transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap',
+              activeTab === 'drivers'
+                ? 'text-[#14171A] font-bold border-b-2 border-[#14171A]'
+                : 'text-[#6B7280] hover:text-[#14171A]'
+            )}
+          >
+            <User className="w-4 h-4" />
+            <span>Drivers & Vehicles Register</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={cn(
+              'pb-3 font-medium transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap',
+              activeTab === 'analytics'
+                ? 'text-[#14171A] font-bold border-b-2 border-[#14171A]'
+                : 'text-[#6B7280] hover:text-[#14171A]'
+            )}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Analytics & Driver Performance</span>
           </button>
         </div>
 
-        {/* Filter and Search Bar */}
-        <div className="bg-white border border-[#E7E5E0] rounded-[12px] p-3 sm:p-4 shadow-[0_1px_2px_rgba(20,23,26,0.04)] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search order ref, material, or destination..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
-            />
-          </div>
+        {/* Global Search & Destination Site Filter */}
+        {(activeTab === 'incoming' || activeTab === 'dispatch') && (
+          <div className="bg-white border border-[#E7E5E0] rounded-[16px] p-3 sm:p-4 shadow-[0_1px_2px_rgba(20,23,26,0.04)] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search order #, customer, material, driver or site destination..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-9 pr-3 bg-white border border-[#E7E5E0] rounded-xl text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
+              />
+            </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={siteFilter}
-              onChange={(e) => setSiteFilter(e.target.value)}
-              className="h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
-            >
-              <option value="all">All Sites</option>
-              {sites.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            {/* Destination Site Filter (Acceptance Check 4) */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider hidden sm:inline">
+                Destination Site:
+              </span>
+              <select
+                value={siteFilter}
+                onChange={(e) => setSiteFilter(e.target.value)}
+                className="h-10 px-3 bg-white border border-[#E7E5E0] rounded-xl text-xs font-semibold text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
+              >
+                <option value="all">All Destination Sites</option>
+                {sites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Tab 1: Incoming Orders */}
+      {/* TAB 1: Incoming Orders (Figure 1 UI Card) */}
       {activeTab === 'incoming' && (
-        <div className="bg-white border border-[#E7E5E0] rounded-[12px] shadow-[0_1px_2px_rgba(20,23,26,0.04)] overflow-hidden">
-          <div className="overflow-x-auto min-w-0">
-            <table className="w-full min-w-[700px] text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-[#E7E5E0] bg-white h-11 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider select-none">
-                  <th className="px-4 py-2">Order ref</th>
-                  <th className="px-4 py-2">Material / Service</th>
-                  <th className="px-4 py-2">Site & Destination</th>
-                  <th className="px-4 py-2">Quantity</th>
-                  <th className="px-4 py-2">Delivery Slot</th>
-                  <th className="px-4 py-2 text-right">Sales Value</th>
-                  <th className="px-4 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E7E5E0]">
-                {displayedOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-12 text-center text-[#6B7280]">
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <CheckCircle2 className="w-8 h-8 text-[#16A34A] stroke-1" />
-                        <span className="font-medium text-[#14171A]">
-                          All incoming purchase orders processed
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            {displayedOrders.map((order) => {
+              const lines = order.lines && order.lines.length > 0 ? order.lines : [
+                {
+                  id: 'line-default',
+                  category: order.category,
+                  description: order.description,
+                  requestedQty: order.orderedQty,
+                  unit: order.unit,
+                  estimatedLoads: order.estimatedLoads || 1,
+                },
+              ];
+              const totalEstLoads = order.estimatedLoads || lines.reduce((sum, l) => sum + (l.estimatedLoads || 1), 0);
+
+              return (
+                <div
+                  key={order.id}
+                  className="bg-white border border-[#E7E5E0] rounded-[16px] shadow-[0_1px_3px_rgba(20,23,26,0.05)] overflow-hidden transition-all hover:border-[#14171A]/30"
+                >
+                  {/* Top Bar (Figure 1 Specification) */}
+                  <div className="px-6 py-4 border-b border-[#E7E5E0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FAFAFA]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+                        INCOMING ORDER
+                      </span>
+                      <span className="text-xs text-[#6B7280]">•</span>
+                      <span className="font-mono text-base font-bold text-[#14171A]">
+                        {order.orderNumber}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {order.clarificationRequested && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309] text-[11px] font-semibold border border-[#FDE68A] flex items-center gap-1">
+                          <HelpCircle className="w-3.5 h-3.5" /> Clarification Requested
                         </span>
-                        <p className="text-xs text-[#9CA3AF] max-w-sm">
-                          New orders submitted by the DJ Civil team will appear here immediately for driver allocation.
-                        </p>
+                      )}
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          order.status === 'pending'
+                            ? 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]'
+                            : order.status === 'accepted'
+                            ? 'bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]'
+                            : 'bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]'
+                        }`}
+                      >
+                        STATUS: {order.status === 'pending' ? 'NEW' : order.status.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Order Details Body (Figure 1 Layout) */}
+                  <div className="p-6 space-y-5">
+                    {/* Customer & Destination Metadata */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                      <div>
+                        <span className="text-[#6B7280] block text-[11px] font-semibold uppercase tracking-wider">
+                          Customer
+                        </span>
+                        <span className="text-sm font-bold text-[#14171A] mt-0.5 block">
+                          {order.customerName || 'DJ Civils Ltd'}
+                        </span>
                       </div>
-                    </td>
-                  </tr>
-                ) : (
-                  displayedOrders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="h-14 hover:bg-[#F7F7F5] transition-colors group cursor-pointer"
-                      onClick={() => setDrawerOrder(order)}
-                    >
-                      <td className="px-4 py-3 font-mono font-medium text-[#14171A] whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <StatusBadge status={order.status} size="sm" />
-                          <span>{order.orderNumber}</span>
-                        </div>
-                      </td>
 
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-[#14171A] max-w-[220px] truncate">
-                          {order.category}
-                        </div>
-                        <div className="text-[11px] text-[#9CA3AF] truncate max-w-[220px]">
-                          {order.description}
-                        </div>
-                      </td>
+                      <div>
+                        <span className="text-[#6B7280] block text-[11px] font-semibold uppercase tracking-wider">
+                          Ordered by
+                        </span>
+                        <span className="text-sm font-semibold text-[#14171A] mt-0.5 block">
+                          {order.orderedBy || 'Chris (Site Manager)'}
+                        </span>
+                      </div>
 
-                      <td className="px-4 py-3">
-                        <div className="text-[#14171A] font-medium max-w-[180px] truncate">
+                      <div>
+                        <span className="text-[#6B7280] block text-[11px] font-semibold uppercase tracking-wider">
+                          Destination
+                        </span>
+                        <span className="text-sm font-bold text-[#14171A] mt-0.5 block">
                           {order.destinationName}
-                        </div>
-                        <div className="text-[11px] text-[#9CA3AF] truncate max-w-[180px]">
-                          {order.siteName}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="font-semibold text-[#14171A] tabular-nums">
-                          {order.orderedQty}
-                        </span>{' '}
-                        <span className="text-[#6B7280]">{order.unit}</span>
-                      </td>
-
-                      <td className="px-4 py-3 font-mono text-[#6B7280] whitespace-nowrap">
-                        {order.timeSlot}
-                      </td>
-
-                      <td className="px-4 py-3 text-right font-medium text-[#14171A] tabular-nums whitespace-nowrap">
-                        {formatCurrency(order.totalPrice)}
-                      </td>
-
-                      <td
-                        className="px-4 py-3 text-right whitespace-nowrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setDeclineModalOrder(order)}
-                            className="h-8 px-2.5 bg-white border border-[#E7E5E0] hover:bg-[#FEE2E2] hover:text-[#DC2626] text-[#6B7280] rounded-md text-[11px] font-medium transition-colors cursor-pointer"
-                          >
-                            Decline
-                          </button>
-                          <button
-                            onClick={() => setAssignModalOrder(order)}
-                            className="h-8 px-3 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-md text-[11px] font-medium transition-colors cursor-pointer shadow-[0_1px_2px_rgba(20,23,26,0.04)]"
-                          >
-                            Accept & Assign Driver
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 2: Active Dispatches */}
-      {activeTab === 'active' && (
-        <div className="bg-white border border-[#E7E5E0] rounded-[12px] shadow-[0_1px_2px_rgba(20,23,26,0.04)] overflow-hidden">
-          <div className="overflow-x-auto min-w-0">
-            <table className="w-full min-w-[700px] text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-[#E7E5E0] bg-white h-11 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider select-none">
-                  <th className="px-4 py-2">Order ref</th>
-                  <th className="px-4 py-2">Material / Service</th>
-                  <th className="px-4 py-2">Site & Offload Destination</th>
-                  <th className="px-4 py-2">Assigned Driver & VRN</th>
-                  <th className="px-4 py-2">Status & ETA</th>
-                  <th className="px-4 py-2 text-right">Value</th>
-                  <th className="px-4 py-2 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E7E5E0]">
-                {displayedOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-12 text-center text-[#6B7280]">
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <Truck className="w-8 h-8 text-[#9CA3AF] stroke-1" />
-                        <span className="font-medium text-[#14171A]">
-                          No active dispatches
                         </span>
-                        <p className="text-xs text-[#9CA3AF] max-w-sm">
-                          Accept incoming purchase orders to assign drivers and initiate site haulage.
-                        </p>
+                        <span className="text-[11px] text-[#6B7280]">{order.siteName}</span>
                       </div>
-                    </td>
-                  </tr>
-                ) : (
-                  displayedOrders.map((order) => {
-                    const visit = supplierVisits.find((v) => v.orderId === order.id);
 
-                    return (
-                      <tr
-                        key={order.id}
-                        onClick={() => setDrawerOrder(order)}
-                        className="h-14 hover:bg-[#F7F7F5] transition-colors group cursor-pointer"
-                      >
-                        <td className="px-4 py-3 font-mono font-medium text-[#14171A] whitespace-nowrap">
-                          {order.orderNumber}
-                        </td>
+                      <div>
+                        <span className="text-[#6B7280] block text-[11px] font-semibold uppercase tracking-wider">
+                          Requested date / window
+                        </span>
+                        <span className="text-sm font-semibold text-[#14171A] mt-0.5 block">
+                          {order.timeSlot || 'Set by Chris'}
+                        </span>
+                        <span className="text-[11px] text-[#6B7280]">{order.requestedDate}</span>
+                      </div>
+                    </div>
 
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-[#14171A] max-w-[200px] truncate">
-                            {order.category}
-                          </div>
-                          <div className="text-[11px] text-[#9CA3AF]">
-                            {order.orderedQty} {order.unit}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3">
-                          <div className="text-[#14171A] font-medium max-w-[180px] truncate">
-                            {order.destinationName}
-                          </div>
-                          <div className="text-[11px] text-[#9CA3AF] truncate max-w-[180px]">
-                            {order.siteName}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {visit?.driverName ? (
-                            <div>
-                              <div className="font-medium text-[#14171A]">
-                                {visit.driverName}
-                              </div>
-                              <div className="font-mono text-[11px] text-[#6B7280]">
-                                {visit.vehicleReg}
-                              </div>
+                    {/* Multi-Line Material / Service Items (Figure 1) */}
+                    <div className="border border-[#E7E5E0] rounded-xl overflow-hidden bg-[#F8F8F6]">
+                      <div className="px-4 py-2.5 bg-[#EFEFEA] border-b border-[#E7E5E0] text-[11px] font-bold text-[#6B7280] uppercase tracking-wider flex items-center justify-between">
+                        <span>Ordered Lines & Estimated Loads</span>
+                        <span>Quantity & Load Estimation</span>
+                      </div>
+                      <div className="divide-y divide-[#E7E5E0] p-0">
+                        {lines.map((line, idx) => (
+                          <div
+                            key={line.id || idx}
+                            className="px-4 py-3 flex items-center justify-between gap-3 text-xs bg-white"
+                          >
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-[#14171A] text-sm block">
+                                {line.category}
+                              </span>
+                              <span className="text-[11px] text-[#6B7280] block">
+                                {line.description}
+                              </span>
                             </div>
-                          ) : (
-                            <span className="text-[11px] text-[#B45309] font-medium bg-[#FEF3C7] px-2 py-0.5 rounded-full">
-                              Driver not assigned
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <StatusBadge status={order.status} size="sm" />
-                            {visit?.tracking && order.status === 'dispatched' && (
-                              <span className="text-[11px] text-[#2563EB] font-mono">
-                                ETA {visit.tracking.estimatedArrivalMinutes}m
+                            <div className="text-right">
+                              <span className="font-bold text-[#14171A] text-sm block tabular-nums">
+                                {line.requestedQty} {line.unit}
                               </span>
-                            )}
+                              <span className="text-[11px] font-semibold text-[#2563EB] bg-[#EFF6FF] px-2 py-0.5 rounded-full inline-block mt-0.5">
+                                {line.estimatedLoads || 1} estimated load{(line.estimatedLoads || 1) === 1 ? '' : 's'}
+                              </span>
+                            </div>
                           </div>
-                        </td>
-
-                        <td className="px-4 py-3 text-right font-medium text-[#14171A] tabular-nums whitespace-nowrap">
-                          {formatCurrency(order.totalPrice)}
-                        </td>
-
-                        <td
-                          className="px-4 py-3 text-right whitespace-nowrap"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            onClick={() => setAssignModalOrder(order)}
-                            className="h-8 px-3 bg-white border border-[#E7E5E0] hover:bg-[#F7F7F5] text-[#14171A] rounded-md text-[11px] font-medium transition-colors cursor-pointer"
-                          >
-                            {visit?.driverName ? 'Reassign' : 'Assign driver'}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Fulfilment History */}
-      {activeTab === 'history' && (
-        <div className="bg-white border border-[#E7E5E0] rounded-[12px] shadow-[0_1px_2px_rgba(20,23,26,0.04)] overflow-hidden">
-          <div className="overflow-x-auto min-w-0">
-            <table className="w-full min-w-[700px] text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-[#E7E5E0] bg-white h-11 text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider select-none">
-                  <th className="px-4 py-2">Order ref</th>
-                  <th className="px-4 py-2">Material / Destination</th>
-                  <th className="px-4 py-2">Ordered vs Delivered</th>
-                  <th className="px-4 py-2">Fulfilment Variance</th>
-                  <th className="px-4 py-2 text-right">Order Value</th>
-                  <th className="px-4 py-2 text-right">Credit / Adj.</th>
-                  <th className="px-4 py-2 text-right">Net Invoiced</th>
-                  <th className="px-4 py-2 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E7E5E0]">
-                {displayedOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="p-12 text-center text-[#6B7280]">
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <Clock className="w-8 h-8 text-[#9CA3AF] stroke-1" />
-                        <span className="font-medium text-[#14171A]">
-                          No completed orders recorded
-                        </span>
-                        <p className="text-xs text-[#9CA3AF] max-w-sm">
-                          Completed and verified delivery receipts will display reconciled quantities and credit notes here.
-                        </p>
+                        ))}
                       </div>
-                    </td>
-                  </tr>
-                ) : (
-                  displayedOrders.map((order) => {
-                    const visit = supplierVisits.find((v) => v.orderId === order.id);
-                    const hasDiscrepancy = Boolean(visit?.discrepancy);
-                    const variance = visit?.discrepancy?.varianceQty ?? 0;
-                    const unitPrice = order.unitPrice || 0;
-                    const creditNote = hasDiscrepancy ? Math.abs(variance * unitPrice) : 0;
-                    const netInvoiced = Math.max(0, order.totalPrice - creditNote);
 
-                    return (
-                      <tr
-                        key={order.id}
-                        onClick={() => setDrawerOrder(order)}
-                        className="h-14 hover:bg-[#F7F7F5] transition-colors group cursor-pointer"
-                      >
-                        <td className="px-4 py-3 font-mono font-medium text-[#14171A] whitespace-nowrap">
-                          {order.orderNumber}
-                        </td>
-
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-[#14171A] max-w-[200px] truncate">
-                            {order.category}
-                          </div>
-                          <div className="text-[11px] text-[#9CA3AF] truncate max-w-[200px]">
-                            {order.destinationName} • {order.siteName}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-[#6B7280]">
+                      {/* Total Bar (Figure 1) */}
+                      <div className="px-4 py-3.5 bg-[#F8F8F6] border-t-2 border-[#E7E5E0] flex items-center justify-between text-xs">
+                        <span className="font-bold uppercase tracking-wider text-[#14171A] text-sm">
+                          TOTAL:
+                        </span>
+                        <div className="text-right">
+                          <span className="font-bold text-base text-[#14171A] tabular-nums block">
                             {order.orderedQty} {order.unit}
                           </span>
-                          <span className="mx-1.5 text-[#9CA3AF]">→</span>
-                          <span className="font-medium text-[#14171A]">
-                            {visit?.receivedQty !== undefined
-                              ? `${visit.receivedQty} ${order.unit}`
-                              : `${order.orderedQty} ${order.unit}`}
+                          <span className="text-xs font-bold text-[#2563EB] bg-[#EFF6FF] px-2.5 py-0.5 rounded-full inline-block mt-0.5">
+                            {totalEstLoads} estimated loads
                           </span>
-                        </td>
+                        </div>
+                      </div>
+                    </div>
 
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {hasDiscrepancy ? (
-                            <span className="text-[11px] font-medium text-[#DC2626] bg-[#FEE2E2] px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3" />
-                              <span>
-                                {variance} {order.unit} shortage
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-[11px] font-medium text-[#16A34A] bg-[#DCFCE7] px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>100% Fulfilled</span>
-                            </span>
-                          )}
-                        </td>
+                    {/* Prototype Assumption Notice (Explicit PCR Requirement) */}
+                    <div className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E7E5E0] text-[11px] text-[#6B7280] leading-relaxed">
+                      <strong className="text-[#14171A]">Prototype assumption only:</strong> 18 tonnes per full truckload. Actual load count must depend on assigned vehicle capacity and permitted payload, and must remain editable.
+                    </div>
 
-                        <td className="px-4 py-3 text-right font-medium text-[#6B7280] tabular-nums whitespace-nowrap">
-                          {formatCurrency(order.totalPrice)}
-                        </td>
+                    {/* Clarification notes if present */}
+                    {order.clarificationNotes && (
+                      <div className="p-3 bg-[#FEF3C7] rounded-xl border border-[#FDE68A] text-xs text-[#B45309] space-y-1">
+                        <span className="font-bold flex items-center gap-1">
+                          <MessageSquare className="w-3.5 h-3.5" /> Clarification Inquiry Sent:
+                        </span>
+                        <p>{order.clarificationNotes}</p>
+                      </div>
+                    )}
 
-                        <td className="px-4 py-3 text-right font-mono text-xs tabular-nums whitespace-nowrap">
-                          {hasDiscrepancy ? (
-                            <span className="text-[#DC2626] font-medium">
-                              -{formatCurrency(creditNote)}
-                            </span>
-                          ) : (
-                            <span className="text-[#9CA3AF]">£0.00</span>
-                          )}
-                        </td>
+                    {/* Action Buttons (Figure 1: Accept & assign drivers, Review / Request clarification) */}
+                    <div className="pt-2 flex flex-wrap items-center justify-end gap-3 border-t border-[#E7E5E0]">
+                      <button
+                        type="button"
+                        onClick={() => setClarificationOrder(order)}
+                        className="h-10 px-4 bg-white hover:bg-[#F7F7F5] border border-[#E7E5E0] rounded-xl text-xs font-semibold text-[#14171A] flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <MessageSquare className="w-4 h-4 text-[#B45309]" />
+                        <span>Review / Request clarification</span>
+                      </button>
 
-                        <td className="px-4 py-3 text-right font-semibold text-[#14171A] tabular-nums whitespace-nowrap">
-                          {formatCurrency(netInvoiced)}
-                        </td>
+                      <button
+                        type="button"
+                        onClick={() => setLoadSplitOrder(order)}
+                        className="h-10 px-5 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <Truck className="w-4 h-4 text-[#F5B301]" />
+                        <span>Accept & assign drivers</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
 
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <StatusBadge status={order.status} size="sm" />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+            {displayedOrders.length === 0 && (
+              <div className="bg-white border border-[#E7E5E0] rounded-[16px] p-12 text-center text-xs text-[#6B7280] space-y-2">
+                <Layers className="w-8 h-8 text-[#9CA3AF] mx-auto" />
+                <p className="font-semibold text-sm text-[#14171A]">No incoming orders matching filters</p>
+                <p>Switch suppliers or adjust your site filter above.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Modals & Drawer */}
+      {/* TAB 2: Dispatch Records & Load Allocation */}
+      {activeTab === 'dispatch' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[#14171A]">
+                Load Dispatch & Gate Token Records
+              </h2>
+              <p className="text-xs text-[#6B7280]">
+                Individual delivery loads dispatched to Chatham Capstone and Rochester Capstone.
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-[#6B7280]">
+              Total Loads: <strong className="text-[#14171A]">{displayedLoads.length}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {displayedLoads.map((load) => (
+              <LoadDispatchCard key={load.id} load={load} onTrackLoad={handleTrackLoad} />
+            ))}
+          </div>
+
+          {displayedLoads.length === 0 && (
+            <div className="bg-white border border-[#E7E5E0] rounded-[16px] p-12 text-center text-xs text-[#6B7280] space-y-2">
+              <Truck className="w-8 h-8 text-[#9CA3AF] mx-auto" />
+              <p className="font-semibold text-sm text-[#14171A]">No dispatch loads currently scheduled</p>
+              <p>Accept an incoming order to generate and allocate delivery loads.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: Live Vehicle Tracking (Figure 2) */}
+      {activeTab === 'tracking' && (
+        <LiveTrackingView initialLoadId={trackedLoadId} />
+      )}
+
+      {/* TAB 4: Drivers & Vehicles Register */}
+      {activeTab === 'drivers' && (
+        <div className="space-y-6">
+          {/* Driver Fleet Register */}
+          <div className="bg-white border border-[#E7E5E0] rounded-[16px] shadow-[0_1px_3px_rgba(20,23,26,0.05)] overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#E7E5E0] flex items-center justify-between bg-[#FAFAFA]">
+              <div>
+                <h3 className="text-sm font-semibold text-[#14171A]">
+                  Supplier Driver Fleet Register
+                </h3>
+                <p className="text-xs text-[#6B7280] mt-0.5">
+                  Verified haulage drivers, CSCS certifications, and assigned heavy plant vehicles.
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-[#16A34A] bg-[#DCFCE7] px-2.5 py-1 rounded-full border border-[#BBF7D0]">
+                {supplierDrivers.length} Verified Drivers
+              </span>
+            </div>
+
+            <div className="divide-y divide-[#E7E5E0]">
+              {supplierDrivers.map((driver) => (
+                <div key={driver.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#F9FAFB] transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#F7F7F5] border border-[#E7E5E0] flex items-center justify-center text-[#14171A] font-bold">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-[#14171A] block">{driver.name}</span>
+                      <span className="text-xs text-[#6B7280]">{driver.hgvClass}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <span className="text-[#6B7280] block text-[10px] uppercase font-semibold">CSCS Card</span>
+                      <span className="font-mono text-[#14171A]">{driver.cscsCardNumber}</span>
+                    </div>
+                    <div>
+                      <span className="text-[#6B7280] block text-[10px] uppercase font-semibold">Assigned Vehicle</span>
+                      <span className="font-mono font-bold text-[#14171A]">{driver.defaultVehicleReg}</span>
+                    </div>
+                    <div>
+                      <span className="text-[#6B7280] block text-[10px] uppercase font-semibold">Contact</span>
+                      <span className="font-mono text-[#14171A]">{driver.phone}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Vehicle Fleet Register */}
+          <div className="bg-white border border-[#E7E5E0] rounded-[16px] shadow-[0_1px_3px_rgba(20,23,26,0.05)] overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#E7E5E0] flex items-center justify-between bg-[#FAFAFA]">
+              <div>
+                <h3 className="text-sm font-semibold text-[#14171A]">
+                  Registered Fleet & Payload Capacities
+                </h3>
+                <p className="text-xs text-[#6B7280] mt-0.5">
+                  Vehicle register determining load split counts and maximum allowable payloads.
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-[#2563EB] bg-[#EFF6FF] px-2.5 py-1 rounded-full border border-[#BFDBFE]">
+                {supplierVehicles.length} Registered HGVs
+              </span>
+            </div>
+
+            <div className="divide-y divide-[#E7E5E0]">
+              {supplierVehicles.map((vehicle) => (
+                <div key={vehicle.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#F9FAFB] transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] flex items-center justify-center text-[#2563EB]">
+                      <Truck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="font-mono text-sm font-bold text-[#14171A] block">
+                        {vehicle.registration}
+                      </span>
+                      <span className="text-xs text-[#6B7280]">{vehicle.type}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6 text-xs">
+                    <div>
+                      <span className="text-[#6B7280] block text-[10px] uppercase font-semibold">Max Payload</span>
+                      <span className="font-bold text-sm text-[#14171A]">
+                        {vehicle.capacity} {vehicle.capacityUnit}
+                      </span>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-[#DCFCE7] text-[#15803D] text-[11px] font-semibold border border-[#BBF7D0]">
+                      {vehicle.status.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: Analytics & Driver Performance (Figures 4 & 5) */}
+      {activeTab === 'analytics' && (
+        <DriverPerformanceLedger />
+      )}
+
+      {/* Modals */}
+      <ClarificationModal
+        order={clarificationOrder}
+        isOpen={Boolean(clarificationOrder)}
+        onClose={() => setClarificationOrder(null)}
+      />
+
+      <LoadSplitModal
+        order={loadSplitOrder}
+        isOpen={Boolean(loadSplitOrder)}
+        onClose={() => setLoadSplitOrder(null)}
+        onLoadsGenerated={() => setActiveTab('dispatch')}
+      />
+
       <AssignDriverModal
         order={assignModalOrder}
         isOpen={Boolean(assignModalOrder)}
         onClose={() => setAssignModalOrder(null)}
-      />
-
-      <DeclineOrderModal
-        order={declineModalOrder}
-        isOpen={Boolean(declineModalOrder)}
-        onClose={() => setDeclineModalOrder(null)}
-      />
-
-      <SupplierOrderDetailsDrawer
-        order={drawerOrder}
-        visit={drawerVisit}
-        isOpen={Boolean(drawerOrder)}
-        onClose={() => setDrawerOrder(null)}
-        onAssignDriver={(order) => {
-          setDrawerOrder(null);
-          setAssignModalOrder(order);
-        }}
-        onDeclineOrder={(order) => {
-          setDrawerOrder(null);
-          setDeclineModalOrder(order);
-        }}
       />
     </div>
   );

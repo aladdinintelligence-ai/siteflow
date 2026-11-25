@@ -14,6 +14,9 @@ import {
   UserProfile,
   SiteDestination,
   SiteRoute,
+  Vehicle,
+  DeliveryLoad,
+  LoadStatus,
 } from './types';
 import {
   SEED_SITES,
@@ -22,6 +25,8 @@ import {
   SEED_ORDERS,
   SEED_VISITS,
   SEED_PROFILES,
+  SEED_VEHICLES,
+  SEED_DELIVERY_LOADS,
 } from '@/data/seed';
 import { api, getSocket, setAuthToken } from './api';
 
@@ -37,6 +42,8 @@ export interface AppState {
   sites: Site[];
   suppliers: Supplier[];
   drivers: Driver[];
+  vehicles: Vehicle[];
+  deliveryLoads: DeliveryLoad[];
   userProfiles: Record<string, UserProfile>;
 
   // App Navigation & Session Context
@@ -75,6 +82,13 @@ export interface AppState {
   ) => void;
   scanOut: (visitId: string) => void;
 
+  // Actions - Supplier Portal Multi-Load Logistics
+  acceptAndSplitOrder: (orderId: string, loadSplit?: { lineId: string; loads: number; payloadPerLoad: number }[]) => void;
+  assignDriverToLoad: (loadId: string, driverId: string, vehicleReg: string) => void;
+  dispatchLoad: (loadId: string) => void;
+  requestClarification: (orderId: string, notes: string) => void;
+  updateLoadStatus: (loadId: string, status: LoadStatus) => void;
+
   // Actions - Map Locations, Approved Routes & Profiles
   updateUserProfile: (role: RoleId, updates: Partial<UserProfile>) => void;
   registerMapLocation: (siteId: string, location: Omit<SiteDestination, 'id'> & { id?: string }) => void;
@@ -93,12 +107,14 @@ export const useAppStore = create<AppState>()(
       sites: SEED_SITES,
       suppliers: SEED_SUPPLIERS,
       drivers: SEED_DRIVERS,
+      vehicles: SEED_VEHICLES,
+      deliveryLoads: SEED_DELIVERY_LOADS,
       userProfiles: SEED_PROFILES,
 
       currentRole: 'driver',
       currentSiteId: 'site-chatham',
       activeDriverId: 'drv-dave',
-      activeSupplierId: 'sup-cemex',
+      activeSupplierId: 'sup-tarmac',
       toast: null,
 
       showToast: (message: string) => {
@@ -366,6 +382,24 @@ export const useAppStore = create<AppState>()(
                 }
               : v
           ),
+          deliveryLoads: state.deliveryLoads.map((l) =>
+            l.orderId === targetVisit?.orderId || l.id === visitId || l.vehicleReg === targetVisit?.vehicleReg
+              ? {
+                  ...l,
+                  status: 'at_gate' as LoadStatus,
+                  gateEntryAt: now,
+                  tracking: l.tracking
+                    ? {
+                        ...l.tracking,
+                        distanceRemainingKm: 0,
+                        estimatedArrivalMinutes: 0,
+                        currentLocationName: 'At Gate - Awaiting Clearance',
+                        lastPingAt: now,
+                      }
+                    : undefined,
+                }
+              : l
+          ),
         }));
 
         // Persist to real backend
@@ -407,6 +441,15 @@ export const useAppStore = create<AppState>()(
           ),
           orders: state.orders.map((o) =>
             o.id === targetVisit.orderId ? { ...o, status: 'on_site' } : o
+          ),
+          deliveryLoads: state.deliveryLoads.map((l) =>
+            l.orderId === targetVisit?.orderId || l.id === visitId || l.vehicleReg === targetVisit?.vehicleReg
+              ? {
+                  ...l,
+                  status: 'on_site' as LoadStatus,
+                  gateEntryAt: l.gateEntryAt || now,
+                }
+              : l
           ),
         }));
 
@@ -544,6 +587,16 @@ export const useAppStore = create<AppState>()(
                 }
               : o
           ),
+          deliveryLoads: state.deliveryLoads.map((l) =>
+            l.orderId === targetVisit?.orderId || l.id === visitId || l.vehicleReg === targetVisit?.vehicleReg
+              ? {
+                  ...l,
+                  status: 'completed' as LoadStatus,
+                  gateExitAt: now,
+                  durationMinutes: duration,
+                }
+              : l
+          ),
         }));
 
         // Persist scan out to real backend
@@ -555,6 +608,220 @@ export const useAppStore = create<AppState>()(
         get().showToast(
           `Visit completed: ${duration}m turnaround duration logged for ${targetVisit.vehicleReg || targetVisit.orderNumber}`
         );
+      },
+
+      acceptAndSplitOrder: (orderId, loadSplit) => {
+        const { orders, deliveryLoads, drivers, vehicles, showToast } = get();
+        const order = orders.find((o) => o.id === orderId);
+        if (!order) return;
+
+        // Update order status to accepted
+        const updatedOrders = orders.map((o) =>
+          o.id === orderId ? { ...o, status: 'accepted' as OrderStatus } : o
+        );
+
+        // Check if loads already exist for this order
+        const existingLoads = deliveryLoads.filter((l) => l.orderId === orderId);
+
+        let newLoads: DeliveryLoad[] = [];
+        if (existingLoads.length > 0) {
+          // Loads already exist; activate them to assigned if pending
+          newLoads = deliveryLoads.map((l) =>
+            l.orderId === orderId
+              ? { ...l, status: l.status === 'pending_assignment' ? ('assigned' as LoadStatus) : l.status }
+              : l
+          );
+        } else {
+          // Generate new loads
+          const supplierDrivers = drivers.filter((d) => d.supplierId === order.supplierId);
+          const supplierVehicles = vehicles.filter((v) => v.supplierId === order.supplierId);
+          const generated: DeliveryLoad[] = [];
+          const lines = order.lines && order.lines.length > 0 ? order.lines : [
+            {
+              id: 'line-default-1',
+              category: order.category,
+              description: order.description,
+              requestedQty: order.orderedQty,
+              unit: order.unit,
+              estimatedLoads: order.estimatedLoads || 1,
+            },
+          ];
+
+          let loadLetterCode = 65; // 'A'
+          lines.forEach((line) => {
+            const defaultCapacity = line.unit === 'tonnes' ? 18 : line.unit === 'litres' ? 5000 : line.unit === 'units' ? 4 : 1;
+            const count = Math.max(1, line.estimatedLoads || Math.ceil(line.requestedQty / defaultCapacity));
+            const qtyPerLoad = Number((line.requestedQty / count).toFixed(1));
+
+            for (let i = 0; i < count; i++) {
+              const letter = String.fromCharCode(loadLetterCode++);
+              const driver = supplierDrivers[i % Math.max(1, supplierDrivers.length)] || supplierDrivers[0];
+              const vehicle = supplierVehicles[i % Math.max(1, supplierVehicles.length)] || supplierVehicles[0];
+              const loadNum = `LD-${order.orderNumber.replace(/[^0-9]/g, '') || '1024'}-${letter}`;
+
+              generated.push({
+                id: `load-${Date.now().toString().slice(-4)}-${i}`,
+                loadNumber: loadNum,
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                orderLineId: line.id,
+                customerName: order.customerName || 'DJ Civils Ltd',
+                siteId: order.siteId,
+                siteName: order.siteName,
+                destinationId: order.destinationId,
+                destinationName: order.destinationName,
+                supplierId: order.supplierId,
+                material: line.category,
+                quantity: qtyPerLoad,
+                unit: line.unit,
+                driverId: driver?.id,
+                driverName: driver?.name,
+                vehicleReg: driver?.defaultVehicleReg || vehicle?.registration || 'REG-PENDING',
+                vehicleCapacity: vehicle?.capacity || defaultCapacity,
+                vehicleType: vehicle?.type || 'Heavy Goods Vehicle',
+                status: 'assigned',
+                qrCode: `SF-LOAD:${loadNum}|ORD:${order.orderNumber}|${order.siteName}|${line.category}:${qtyPerLoad}${line.unit}`,
+              });
+            }
+          });
+          newLoads = [...deliveryLoads, ...generated];
+        }
+
+        set({
+          orders: updatedOrders,
+          deliveryLoads: newLoads,
+        });
+
+        showToast(`Order ${order.orderNumber} accepted. Individual loads generated & ready for dispatch.`);
+      },
+
+      assignDriverToLoad: (loadId, driverId, vehicleReg) => {
+        const { deliveryLoads, drivers, vehicles, showToast } = get();
+        const load = deliveryLoads.find((l) => l.id === loadId);
+        const driver = drivers.find((d) => d.id === driverId);
+        const reg = vehicleReg ? vehicleReg.trim().toUpperCase() : driver?.defaultVehicleReg || 'REG-ASSIGNED';
+        const veh = vehicles.find((v) => v.registration.toUpperCase() === reg);
+
+        set({
+          deliveryLoads: deliveryLoads.map((l) =>
+            l.id === loadId
+              ? {
+                  ...l,
+                  driverId,
+                  driverName: driver?.name || 'Assigned Driver',
+                  vehicleReg: reg,
+                  vehicleCapacity: veh?.capacity || l.vehicleCapacity || 18,
+                  vehicleType: veh?.type || l.vehicleType,
+                  status: 'assigned',
+                }
+              : l
+          ),
+        });
+
+        showToast(`Driver ${driver?.name || 'allocated'} (${reg}) assigned to load ${load?.loadNumber || loadId}`);
+      },
+
+      dispatchLoad: (loadId) => {
+        const { deliveryLoads, orders, showToast } = get();
+        const load = deliveryLoads.find((l) => l.id === loadId);
+        if (!load) return;
+
+        const now = new Date().toISOString();
+        const tracking: LiveTrackingData = {
+          consentGranted: true,
+          driverCanToggle: true,
+          distanceRemainingKm: 4.2,
+          estimatedArrivalMinutes: 12,
+          currentLocationName: 'In transit - En route via arterial haul road',
+          lastPingAt: now,
+          disclaimer: 'Live telematics subject to site manager and gate verification.',
+        };
+
+        set({
+          deliveryLoads: deliveryLoads.map((l) =>
+            l.id === loadId
+              ? {
+                  ...l,
+                  status: 'dispatched',
+                  dispatchedAt: now,
+                  estimatedArrivalMinutes: 12,
+                  tracking,
+                }
+              : l
+          ),
+          orders: orders.map((o) =>
+            o.id === load.orderId && (o.status === 'pending' || o.status === 'accepted')
+              ? { ...o, status: 'dispatched' }
+              : o
+          ),
+        });
+
+        showToast(`Load ${load.loadNumber} dispatched! Live ETA: 12 mins to ${load.destinationName}`);
+      },
+
+      requestClarification: (orderId, notes) => {
+        const { orders, showToast } = get();
+        const order = orders.find((o) => o.id === orderId);
+        set({
+          orders: orders.map((o) =>
+            o.id === orderId
+              ? {
+                  ...o,
+                  clarificationRequested: true,
+                  clarificationNotes: notes,
+                  notes: notes ? `Clarification: ${notes}` : o.notes,
+                }
+              : o
+          ),
+        });
+
+        showToast(`Clarification request sent to Chris (Site Manager) for ${order?.orderNumber || 'order'}.`);
+      },
+
+      updateLoadStatus: (loadId, status) => {
+        const now = new Date().toISOString();
+        const targetLoad = get().deliveryLoads.find((l) => l.id === loadId);
+        set((state) => ({
+          deliveryLoads: state.deliveryLoads.map((l) =>
+            l.id === loadId
+              ? {
+                  ...l,
+                  status,
+                  dispatchedAt: status === 'dispatched' ? (l.dispatchedAt || now) : l.dispatchedAt,
+                  gateEntryAt: (status === 'at_gate' || status === 'on_site') ? (l.gateEntryAt || now) : l.gateEntryAt,
+                  gateExitAt: status === 'completed' ? (l.gateExitAt || now) : l.gateExitAt,
+                  durationMinutes: status === 'completed' ? (l.durationMinutes || 28) : l.durationMinutes,
+                  tracking: status === 'dispatched' ? (l.tracking || {
+                    consentGranted: true,
+                    driverCanToggle: true,
+                    distanceRemainingKm: 4.2,
+                    estimatedArrivalMinutes: 12,
+                    currentLocationName: 'In transit to site gate',
+                    lastPingAt: now,
+                    disclaimer: 'Live telematics subject to site manager and gate verification.',
+                  }) : status === 'at_gate' ? {
+                    consentGranted: true,
+                    driverCanToggle: true,
+                    distanceRemainingKm: 0,
+                    estimatedArrivalMinutes: 0,
+                    currentLocationName: 'At Gate - Awaiting Clearance',
+                    lastPingAt: now,
+                    disclaimer: 'Live telematics subject to site manager and gate verification.',
+                  } : status === 'on_site' ? {
+                    consentGranted: true,
+                    driverCanToggle: true,
+                    distanceRemainingKm: 0,
+                    estimatedArrivalMinutes: 0,
+                    currentLocationName: `On Site - Discharge at ${l.destinationName}`,
+                    lastPingAt: now,
+                    disclaimer: 'Live telematics subject to site manager and gate verification.',
+                  } : undefined,
+                }
+              : l
+          ),
+        }));
+
+        get().showToast(`Load ${targetLoad?.loadNumber || loadId} status updated: ${status.replace('_', ' ').toUpperCase()}`);
       },
 
       updateUserProfile: (role, updates) => {

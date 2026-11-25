@@ -13,6 +13,28 @@ interface NewOrderModalProps {
 
 const MATERIAL_CATEGORIES = [
   {
+    category: 'Aggregates Package (6F5, Type 1, Reject Sand)',
+    description: 'Phase 2A Link Road aggregate package: 6F5 (18t), Type 1 (54t), Reject Sand (18t).',
+    unit: 'tonnes',
+    defaultQty: 90,
+    defaultPrice: 28.0,
+    isMultiLine: true,
+  },
+  {
+    category: 'Red Diesel Fuel (Ultra-Low Sulphur EN 590)',
+    description: 'Bulk red diesel delivery for site generators, 30t excavators, and dumpers.',
+    unit: 'litres',
+    defaultQty: 5000,
+    defaultPrice: 1.12,
+  },
+  {
+    category: 'Portable Welfare Toilets (Chemical Units)',
+    description: 'Mains-free chemical portable site toilets with hand sanitiser stations.',
+    unit: 'units',
+    defaultQty: 4,
+    defaultPrice: 85.0,
+  },
+  {
     category: 'Sharp Washed Concreting Sand (0-4mm)',
     description: 'Bulk washed concreting sand for structural slab bedding and screed.',
     unit: 'tonnes',
@@ -214,9 +236,52 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
 
     const totalPrice = Number((orderedQty * unitPrice).toFixed(2));
 
+    const isAggregatePackage = category.includes('Aggregates Package') || category.includes('6F5');
+    const lines = isAggregatePackage
+      ? [
+          {
+            id: `line-${Date.now()}-1`,
+            category: '6F5',
+            description: '6F5 Selected Granular Fill capping material',
+            requestedQty: 18,
+            unit: 'tonnes',
+            estimatedLoads: 1,
+          },
+          {
+            id: `line-${Date.now()}-2`,
+            category: 'Type 1',
+            description: 'MOT Type 1 Crushed Granite 0-40mm sub-base',
+            requestedQty: 54,
+            unit: 'tonnes',
+            estimatedLoads: 3,
+          },
+          {
+            id: `line-${Date.now()}-3`,
+            category: 'Reject Sand',
+            description: 'Reject Sand for bedding and pipe surround',
+            requestedQty: 18,
+            unit: 'tonnes',
+            estimatedLoads: 1,
+          },
+        ]
+      : [
+          {
+            id: `line-${Date.now()}-1`,
+            category: category.trim(),
+            description: description.trim(),
+            requestedQty: orderedQty,
+            unit,
+            estimatedLoads: Math.max(1, Math.ceil(orderedQty / (unit === 'tonnes' ? 18 : unit === 'litres' ? 5000 : unit === 'units' ? 4 : 1))),
+          },
+        ];
+
+    const estimatedLoads = isAggregatePackage ? 5 : lines[0].estimatedLoads || 1;
+
     createOrder({
       siteId,
       siteName: selectedSite?.name || 'Site Location',
+      customerName: 'DJ Civils Ltd',
+      orderedBy: 'Chris (Site Manager)',
       supplierId: supplier.id,
       supplierName: supplier.name,
       type,
@@ -224,13 +289,15 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
       description: description.trim(),
       orderedQty,
       unit,
+      lines,
+      estimatedLoads,
       destinationId: destination?.id || selectedSite?.destinations[0]?.id || 'dest-chatham-dock',
       destinationName: destination?.name || selectedSite?.destinations[0]?.name || 'Site Offload Zone',
       // PCR Requirement: SM does NOT select vehicle or driver; supplier selects on dispatch
       vehicleReg: undefined,
       requestedDate: new Date().toISOString().split('T')[0],
       // PCR Requirement: Suppliers can deliver at any time (open delivery window)
-      timeSlot: 'Any time (Open delivery window)',
+      timeSlot: 'Set by Chris (Open delivery window)',
       unitPrice,
       totalPrice,
       commercialTerms,
