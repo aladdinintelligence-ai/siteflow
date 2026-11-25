@@ -11,6 +11,9 @@ import {
   Driver,
   DiscrepancyRecord,
   LiveTrackingData,
+  UserProfile,
+  SiteDestination,
+  SiteRoute,
 } from './types';
 import {
   SEED_SITES,
@@ -18,6 +21,7 @@ import {
   SEED_DRIVERS,
   SEED_ORDERS,
   SEED_VISITS,
+  SEED_PROFILES,
 } from '@/data/seed';
 import { api, getSocket, setAuthToken } from './api';
 
@@ -33,6 +37,7 @@ export interface AppState {
   sites: Site[];
   suppliers: Supplier[];
   drivers: Driver[];
+  userProfiles: Record<string, UserProfile>;
 
   // App Navigation & Session Context
   currentRole: RoleId;
@@ -69,6 +74,15 @@ export interface AppState {
     reasonCode?: DiscrepancyRecord['reasonCode']
   ) => void;
   scanOut: (visitId: string) => void;
+
+  // Actions - Map Locations, Approved Routes & Profiles
+  updateUserProfile: (role: RoleId, updates: Partial<UserProfile>) => void;
+  registerMapLocation: (siteId: string, location: Omit<SiteDestination, 'id'> & { id?: string }) => void;
+  updateMapLocation: (siteId: string, locationId: string, updates: Partial<SiteDestination>) => void;
+  deleteMapLocation: (siteId: string, locationId: string) => void;
+  setSiteDrawing: (siteId: string, drawingUrl: string, drawingTitle?: string) => void;
+  toggleRoadClosure: (siteId: string, closureName: string, reason: string) => void;
+  toggleLocationRouteApproval: (siteId: string, destinationId: string, isApproved?: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -79,6 +93,7 @@ export const useAppStore = create<AppState>()(
       sites: SEED_SITES,
       suppliers: SEED_SUPPLIERS,
       drivers: SEED_DRIVERS,
+      userProfiles: SEED_PROFILES,
 
       currentRole: 'driver',
       currentSiteId: 'site-chatham',
@@ -540,6 +555,185 @@ export const useAppStore = create<AppState>()(
         get().showToast(
           `Visit completed: ${duration}m turnaround duration logged for ${targetVisit.vehicleReg || targetVisit.orderNumber}`
         );
+      },
+
+      updateUserProfile: (role, updates) => {
+        set((state) => {
+          const current = state.userProfiles[role] || state.userProfiles.manager;
+          return {
+            userProfiles: {
+              ...state.userProfiles,
+              [role]: { ...current, ...updates },
+            },
+          };
+        });
+        get().showToast('Profile credentials and details updated successfully.');
+      },
+
+      registerMapLocation: (siteId, locationData) => {
+        const id = locationData.id || `dest-${Date.now().toString().slice(-4)}`;
+        const code = locationData.code || `CH-D${Math.floor(Math.random() * 90 + 10)}`;
+        const newLocation: SiteDestination = {
+          ...locationData,
+          id,
+          code,
+          locationType: locationData.locationType || 'delivery',
+          isActive: locationData.isActive !== false,
+          isApproved: Boolean(locationData.isApproved),
+        };
+
+        set((state) => ({
+          sites: state.sites.map((s) => {
+            if (s.id !== siteId) return s;
+            const updatedDests = [...s.destinations, newLocation];
+            // If approved, create default route from Gate 1
+            const primaryGate = s.gates[0];
+            let updatedRoutes = [...s.routes];
+            if (newLocation.isApproved && primaryGate) {
+              const gx = primaryGate.coordinates.x;
+              const gy = primaryGate.coordinates.y;
+              const dx = newLocation.coordinates.x;
+              const dy = newLocation.coordinates.y;
+              const midY = (gy + dy) / 2;
+              const pathD = `M ${gx} ${gy} L ${gx} ${midY} L ${dx} ${midY} L ${dx} ${dy}`;
+              updatedRoutes.push({
+                gateId: primaryGate.id,
+                destinationId: id,
+                pathD,
+                estimatedDriveMinutes: 3,
+                oneWay: true,
+                speedLimitKmh: 10,
+                isApproved: true,
+              });
+            }
+            return {
+              ...s,
+              destinations: updatedDests,
+              routes: updatedRoutes,
+            };
+          }),
+        }));
+
+        get().showToast(`Location ${newLocation.name} (${newLocation.code}) registered on site map.`);
+      },
+
+      updateMapLocation: (siteId, locationId, updates) => {
+        set((state) => ({
+          sites: state.sites.map((s) => {
+            if (s.id !== siteId) return s;
+            const updatedDests = s.destinations.map((d) =>
+              d.id === locationId ? { ...d, ...updates } : d
+            );
+            return {
+              ...s,
+              destinations: updatedDests,
+            };
+          }),
+        }));
+        get().showToast('Site map location updated.');
+      },
+
+      deleteMapLocation: (siteId, locationId) => {
+        set((state) => ({
+          sites: state.sites.map((s) => {
+            if (s.id !== siteId) return s;
+            return {
+              ...s,
+              destinations: s.destinations.filter((d) => d.id !== locationId),
+              routes: s.routes.filter((r) => r.destinationId !== locationId),
+            };
+          }),
+        }));
+        get().showToast('Location removed from site map.');
+      },
+
+      setSiteDrawing: (siteId, drawingUrl, drawingTitle) => {
+        set((state) => ({
+          sites: state.sites.map((s) =>
+            s.id === siteId
+              ? {
+                  ...s,
+                  drawingUrl,
+                  drawingTitle: drawingTitle || s.drawingTitle || 'Phase 2A Link Road, East Hill, Chatham',
+                }
+              : s
+          ),
+        }));
+        get().showToast('Engineering reference drawing attached successfully.');
+      },
+
+      toggleRoadClosure: (siteId, closureName, reason) => {
+        set((state) => ({
+          sites: state.sites.map((s) => {
+            if (s.id !== siteId) return s;
+            const existing = s.closedRoads || [];
+            const found = existing.find((c) => c.name === closureName);
+            let updatedClosures;
+            if (found) {
+              updatedClosures = existing.filter((c) => c.name !== closureName);
+            } else {
+              updatedClosures = [
+                ...existing,
+                { id: `cls-${Date.now()}`, name: closureName, reason, active: true },
+              ];
+            }
+            return {
+              ...s,
+              closedRoads: updatedClosures,
+            };
+          }),
+        }));
+        get().showToast(`Road restriction updated for ${closureName}.`);
+      },
+
+      toggleLocationRouteApproval: (siteId, destinationId, isApproved) => {
+        set((state) => ({
+          sites: state.sites.map((s) => {
+            if (s.id !== siteId) return s;
+            const targetDest = s.destinations.find((d) => d.id === destinationId);
+            if (!targetDest) return s;
+
+            const newApproval = isApproved !== undefined ? isApproved : !targetDest.isApproved;
+            const updatedDests = s.destinations.map((d) =>
+              d.id === destinationId ? { ...d, isApproved: newApproval } : d
+            );
+
+            // Update routes
+            let updatedRoutes = [...s.routes];
+            if (newApproval) {
+              const existingRoute = s.routes.find((r) => r.destinationId === destinationId);
+              if (!existingRoute && s.gates[0]) {
+                const gx = s.gates[0].coordinates.x;
+                const gy = s.gates[0].coordinates.y;
+                const dx = targetDest.coordinates.x;
+                const dy = targetDest.coordinates.y;
+                const midY = (gy + dy) / 2;
+                updatedRoutes.push({
+                  gateId: s.gates[0].id,
+                  destinationId,
+                  pathD: `M ${gx} ${gy} L ${gx} ${midY} L ${dx} ${midY} L ${dx} ${dy}`,
+                  estimatedDriveMinutes: 3,
+                  oneWay: true,
+                  speedLimitKmh: 10,
+                  isApproved: true,
+                });
+              } else if (existingRoute) {
+                updatedRoutes = updatedRoutes.map((r) =>
+                  r.destinationId === destinationId ? { ...r, isApproved: true } : r
+                );
+              }
+            } else {
+              updatedRoutes = updatedRoutes.filter((r) => r.destinationId !== destinationId);
+            }
+
+            return {
+              ...s,
+              destinations: updatedDests,
+              routes: updatedRoutes,
+            };
+          }),
+        }));
+        get().showToast('Route approval status updated.');
       },
     }),
     {

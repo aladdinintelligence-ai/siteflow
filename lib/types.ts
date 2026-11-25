@@ -36,6 +36,8 @@ export interface Gate {
   coordinates: { x: number; y: number }; // Relative percentage on SVG site plan (0-100)
 }
 
+export type LocationType = 'gate' | 'delivery' | 'parking' | 'service';
+
 export interface SiteDestination {
   id: string;
   name: string;
@@ -44,6 +46,17 @@ export interface SiteDestination {
   coordinates: { x: number; y: number };
   unloadingInstructions: string;
   hazardWarnings: string[];
+  locationType?: LocationType;
+  isActive?: boolean;
+  isApproved?: boolean; // Approved traversable route verified from Gate 1
+  approvedRouteSvg?: string;
+}
+
+export interface SiteRoadClosure {
+  id: string;
+  name: string;
+  reason: string;
+  active: boolean;
 }
 
 export interface SiteRoute {
@@ -53,6 +66,7 @@ export interface SiteRoute {
   estimatedDriveMinutes: number;
   oneWay: boolean;
   speedLimitKmh: number;
+  isApproved?: boolean;
 }
 
 export interface Site {
@@ -65,6 +79,28 @@ export interface Site {
   gates: Gate[];
   destinations: SiteDestination[];
   routes: SiteRoute[];
+  drawingTitle?: string; // e.g. "Phase 2A Link Road, East Hill, Chatham"
+  drawingType?: string; // e.g. "Engineering Road & Drainage Reference Layer"
+  drawingUrl?: string; // Custom uploaded drawing URL / base64
+  hasCommissionedMap?: boolean; // True for Chatham Capstone, false for Rochester Capstone
+  closedRoads?: SiteRoadClosure[];
+}
+
+export interface UserProfile {
+  id: string;
+  role: RoleId;
+  name: string;
+  email: string;
+  phone: string;
+  organization: string;
+  avatarUrl?: string;
+  jobTitle?: string;
+  siteId?: string;
+  siteName?: string;
+  radioChannel?: string;
+  cscsNumber?: string;
+  inductionStatus?: 'Verified' | 'Pending' | 'Exempt';
+  vehicleReg?: string; // Assigned vehicle registration for drivers
 }
 
 export interface Supplier {

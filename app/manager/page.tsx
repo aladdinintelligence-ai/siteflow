@@ -6,6 +6,7 @@ import { Order, Visit } from '@/lib/types';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { NewOrderModal } from '@/components/ordering/NewOrderModal';
 import { OrderDetailDrawer } from '@/components/ordering/OrderDetailDrawer';
+import { ChathamMapAdminModal } from '@/components/manager/ChathamMapAdminModal';
 import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils';
 import {
   BarChart,
@@ -46,6 +47,7 @@ export default function SiteManagerPage() {
 
   const [activeTab, setActiveTab] = useState<'orders' | 'expenditure' | 'reports'>('orders');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isMapAdminOpen, setIsMapAdminOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Filters
@@ -201,6 +203,15 @@ export default function SiteManagerPage() {
 
         {/* Primary Action: Visible New Order / Book Service button */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => setIsMapAdminOpen(true)}
+            className="h-11 px-4 bg-white border border-[#E7E5E0] hover:bg-[#F8F8F6] text-[#14171A] rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            title="Manage Chatham Capstone site map, registered locations and approved routes"
+          >
+            <MapPin className="w-4 h-4 text-[#F5B301]" />
+            <span>Chatham Map & Routes</span>
+          </button>
+
           <button
             onClick={() => setIsNewModalOpen(true)}
             className="h-11 px-5 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg active:scale-98"
@@ -856,6 +867,12 @@ export default function SiteManagerPage() {
         order={selectedOrder}
         visit={selectedVisit}
         onClose={() => setSelectedOrder(null)}
+      />
+
+      {/* Chatham Capstone Map & Routes Admin Modal */}
+      <ChathamMapAdminModal
+        isOpen={isMapAdminOpen}
+        onClose={() => setIsMapAdminOpen(false)}
       />
     </div>
   );

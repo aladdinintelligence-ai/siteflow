@@ -323,13 +323,15 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
               <select
                 value={destinationId}
                 onChange={(e) => setDestinationId(e.target.value)}
-                className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
+                className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs font-medium text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
               >
-                {selectedSite?.destinations.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} ({d.zone})
-                  </option>
-                ))}
+                {selectedSite?.destinations
+                  .filter((d) => d.isActive !== false)
+                  .map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.code}) {d.isApproved ? '· Approved Traversable' : '· Escort Required'}
+                    </option>
+                  ))}
               </select>
             </div>
           </div>

@@ -48,6 +48,7 @@ export const ROUTE_PERMISSIONS: Record<string, RoleId[]> = {
   '/marshal': ['marshal', 'manager', 'director'],
   '/analyst': ['analyst', 'manager', 'director'],
   '/discovery': ['manager', 'director'],
+  '/profile': ['manager', 'director', 'ordering', 'supplier', 'driver', 'marshal', 'analyst'],
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

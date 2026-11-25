@@ -6,12 +6,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User, LogOut, ChevronDown, Shield, Building, Truck, ExternalLink, RefreshCw } from 'lucide-react';
 import { ROLES } from '@/config/roles';
+import { UserProfileModal } from '@/components/profile/UserProfileModal';
 import { cn } from '@/lib/utils';
 
 export const UserAccountMenu: React.FC = () => {
   const router = useRouter();
   const { user, logout, isLoading } = useAuth();
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,6 +94,21 @@ export const UserAccountMenu: React.FC = () => {
 
             {/* Menu Links */}
             <div className="py-1.5 space-y-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  setIsProfileOpen(true);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between text-[#14171A] hover:bg-[#F8F8F6] transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <User className="w-3.5 h-3.5 text-[#6B7280]" />
+                  <span>My Profile & Credentials</span>
+                </div>
+                <span className="text-[10px] text-[#9CA3AF]">View/Edit</span>
+              </button>
+
               <Link
                 href={homePath}
                 onClick={() => setIsOpen(false)}
@@ -133,6 +150,12 @@ export const UserAccountMenu: React.FC = () => {
           </div>
         </>
       )}
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
     </div>
   );
 };
