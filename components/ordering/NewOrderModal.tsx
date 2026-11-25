@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { OrderType } from '@/lib/types';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, Clock, Sparkles } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface NewOrderModalProps {
@@ -11,20 +11,122 @@ interface NewOrderModalProps {
   onClose: () => void;
 }
 
-const MATERIAL_PRESETS = [
-  { label: 'Sand', category: 'Sharp Washed Concreting Sand (0-4mm)', description: 'Bulk washed sand for structural slab bedding and quayside screed.', unit: 'tonnes', qty: 20, price: 26.5 },
-  { label: 'Wood', category: 'C24 Structural Timber 47x150mm', description: 'Kiln-dried treated structural timber carcassing 4.8m lengths.', unit: 'units', qty: 120, price: 14.5 },
-  { label: 'Pipes', category: '300mm Twinwall Drainage Pipes (6m)', description: 'High-density polyethylene surface water carrier pipe with couplers.', unit: 'lengths', qty: 35, price: 78.0 },
-  { label: 'Cement', category: 'C35/45 Ready-Mix Structural Concrete', description: 'Marine concrete pump mix, slump 120mm, high sulphate resistance.', unit: 'm³', qty: 24, price: 115.0 },
-  { label: 'Aggregates', category: 'MOT Type 1 Sub-Base Granite', description: '0-40mm crushed granite aggregate for heavy haul road base.', unit: 'tonnes', qty: 28, price: 24.5 },
+const MATERIAL_CATEGORIES = [
+  {
+    category: 'Sharp Washed Concreting Sand (0-4mm)',
+    description: 'Bulk washed concreting sand for structural slab bedding and screed.',
+    unit: 'tonnes',
+    defaultQty: 20,
+    defaultPrice: 26.5,
+  },
+  {
+    category: 'C24 Structural Timber 47x150mm',
+    description: 'Kiln-dried treated structural timber carcassing 4.8m lengths.',
+    unit: 'units',
+    defaultQty: 120,
+    defaultPrice: 14.5,
+  },
+  {
+    category: '300mm Twinwall Drainage Pipes (6m)',
+    description: 'High-density polyethylene surface water carrier pipe with couplers.',
+    unit: 'lengths',
+    defaultQty: 35,
+    defaultPrice: 78.0,
+  },
+  {
+    category: 'C35/45 Ready-Mix Structural Concrete',
+    description: 'Marine concrete pump mix, slump 120mm, high sulphate resistance.',
+    unit: 'm³',
+    defaultQty: 24,
+    defaultPrice: 115.0,
+  },
+  {
+    category: 'MOT Type 1 Sub-Base Granite Aggregate',
+    description: '0-40mm crushed granite aggregate for heavy haul road base.',
+    unit: 'tonnes',
+    defaultQty: 28,
+    defaultPrice: 24.5,
+  },
+  {
+    category: 'High-Tensile B500B Steel Reinforcement Rebar',
+    description: 'Fabricated high-yield steel reinforcement rebar cage bundles.',
+    unit: 'tonnes',
+    defaultQty: 15,
+    defaultPrice: 850.0,
+  },
+  {
+    category: 'Other Construction Material',
+    description: 'General construction and civils building supplies.',
+    unit: 'units',
+    defaultQty: 10,
+    defaultPrice: 50.0,
+  },
 ];
 
-const SERVICE_PRESETS = [
-  { label: 'Toilet Cleaning', category: 'Welfare Cabins & Toilet Sanitation', description: 'Weekly complete waste tank pump-out, chemical recharge and deep sanitisation.', unit: 'visits', qty: 1, price: 160.0 },
-  { label: 'Tyre Repairs', category: 'Mobile Plant / 8-Wheeler Tyre Repair', description: 'Emergency on-site vulcanising puncture repair and tyre bead refitting.', unit: 'repairs', qty: 2, price: 185.0 },
-  { label: 'Machinery Repairs', category: 'Excavator Hydraulic & Mechanical Repair', description: 'Mobile field engineer for 30t excavator hydraulic line leak and ram repair.', unit: 'hours', qty: 4, price: 95.0 },
-  { label: 'Dust Suppression', category: 'Site Road Dust Suppression Bowser', description: '10,000L tractor-towed road pressure spray for quayside haul roads.', unit: 'days', qty: 1, price: 420.0 },
-  { label: 'Scaffolding Audit', category: 'Scaffolding & Edge Protection Inspection', description: 'Weekly working-at-height statutory safety inspection and green tag handover.', unit: 'audits', qty: 1, price: 210.0 },
+const SERVICE_CATEGORIES = [
+  {
+    category: 'Welfare Cabins & Toilet Sanitation',
+    description: 'Weekly complete waste tank pump-out, chemical recharge and deep sanitisation.',
+    unit: 'visits',
+    defaultQty: 1,
+    defaultPrice: 160.0,
+  },
+  {
+    category: 'Emergency Tyre Repairs & Replacement',
+    description: 'Emergency on-site vulcanising puncture repair and heavy plant tyre bead refitting.',
+    unit: 'repairs',
+    defaultQty: 2,
+    defaultPrice: 185.0,
+  },
+  {
+    category: 'Mobile Plant & Machinery Field Repairs',
+    description: 'Mobile field engineer for 30t excavator hydraulic line leak and mechanical ram repair.',
+    unit: 'hours',
+    defaultQty: 4,
+    defaultPrice: 95.0,
+  },
+  {
+    category: 'Site Dust Suppression & Bowser Spray',
+    description: '10,000L tractor-towed road pressure spray for haul roads and dust abatement.',
+    unit: 'days',
+    defaultQty: 1,
+    defaultPrice: 420.0,
+  },
+  {
+    category: 'Scaffolding & Edge Protection Safety Audit',
+    description: 'Weekly working-at-height statutory safety inspection and green tag handover.',
+    unit: 'audits',
+    defaultQty: 1,
+    defaultPrice: 210.0,
+  },
+  {
+    category: 'Mobile Crane Lift & Rigging Inspection',
+    description: 'Appointed Person and rigging crew for plant positioning and lift plan certification.',
+    unit: 'hours',
+    defaultQty: 8,
+    defaultPrice: 185.0,
+  },
+  {
+    category: 'Site Security & Out-of-Hours Patrol',
+    description: 'SIA licensed perimeter static guard and hourly checkpoint security patrols.',
+    unit: 'shifts',
+    defaultQty: 7,
+    defaultPrice: 240.0,
+  },
+  {
+    category: 'Waste Management & Skip Exchange',
+    description: '16-yard enclosed roll-on-roll-off construction waste container exchange.',
+    unit: 'loads',
+    defaultQty: 2,
+    defaultPrice: 380.0,
+  },
+  {
+    category: 'Other Specialist Site Service',
+    description: 'Specialist engineering inspection or sub-contractor site attendance.',
+    unit: 'hours',
+    defaultQty: 1,
+    defaultPrice: 150.0,
+  },
 ];
 
 export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose }) => {
@@ -34,13 +136,11 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
   const [siteId, setSiteId] = useState(currentSiteId || sites[0]?.id || 'site-chatham');
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || 'sup-cemex');
   const [destinationId, setDestinationId] = useState('');
-  const [category, setCategory] = useState('');
-  const [description, setDescription] = useState('');
-  const [orderedQty, setOrderedQty] = useState<number>(20);
-  const [unit, setUnit] = useState('tonnes');
-  const [vehicleReg, setVehicleReg] = useState('KX68 VKF');
-  const [timeSlot, setTimeSlot] = useState('09:00 - 10:00');
-  const [unitPrice, setUnitPrice] = useState<number>(32);
+  const [category, setCategory] = useState(MATERIAL_CATEGORIES[0].category);
+  const [description, setDescription] = useState(MATERIAL_CATEGORIES[0].description);
+  const [orderedQty, setOrderedQty] = useState<number>(MATERIAL_CATEGORIES[0].defaultQty);
+  const [unit, setUnit] = useState(MATERIAL_CATEGORIES[0].unit);
+  const [unitPrice, setUnitPrice] = useState<number>(MATERIAL_CATEGORIES[0].defaultPrice);
   const [commercialTerms, setCommercialTerms] = useState('Standard Net 30 days.');
   const [error, setError] = useState<string | null>(null);
 
@@ -53,22 +153,38 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
     }
   }, [selectedSite, siteId]);
 
-  // Adjust default units based on type
-  useEffect(() => {
-    if (type === 'service') {
-      setUnit('hours');
-      setCategory('Specialist Mobile Crane Lift (60t)');
-      setDescription('Appointed Person and rigging crew for rooftop plant positioning.');
-      setUnitPrice(185);
-      setOrderedQty(8);
+  // Adjust defaults when type changes
+  const handleTypeChange = (newType: OrderType) => {
+    setType(newType);
+    if (newType === 'service') {
+      const preset = SERVICE_CATEGORIES[0];
+      setCategory(preset.category);
+      setDescription(preset.description);
+      setUnit(preset.unit);
+      setOrderedQty(preset.defaultQty);
+      setUnitPrice(preset.defaultPrice);
     } else {
-      setUnit('tonnes');
-      setCategory('MOT Type 1 Sub-Base Granite');
-      setDescription('Crushed granite aggregate 0-40mm for crane hardstanding pad compaction.');
-      setUnitPrice(28.5);
-      setOrderedQty(25);
+      const preset = MATERIAL_CATEGORIES[0];
+      setCategory(preset.category);
+      setDescription(preset.description);
+      setUnit(preset.unit);
+      setOrderedQty(preset.defaultQty);
+      setUnitPrice(preset.defaultPrice);
     }
-  }, [type]);
+  };
+
+  // Handle category dropdown change
+  const handleCategoryChange = (newCategory: string) => {
+    setCategory(newCategory);
+    const list = type === 'service' ? SERVICE_CATEGORIES : MATERIAL_CATEGORIES;
+    const match = list.find((item) => item.category === newCategory);
+    if (match) {
+      setDescription(match.description);
+      setUnit(match.unit);
+      setOrderedQty(match.defaultQty);
+      setUnitPrice(match.defaultPrice);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -77,11 +193,11 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
     setError(null);
 
     if (!category.trim()) {
-      setError('Please provide a category or item name.');
+      setError('Please select a category or service item.');
       return;
     }
     if (!description.trim()) {
-      setError('Please provide order specifications / description.');
+      setError('Please provide order specifications / scope of work.');
       return;
     }
     if (orderedQty <= 0) {
@@ -110,13 +226,15 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
       unit,
       destinationId: destination?.id || selectedSite?.destinations[0]?.id || 'dest-chatham-dock',
       destinationName: destination?.name || selectedSite?.destinations[0]?.name || 'Site Offload Zone',
-      vehicleReg: vehicleReg.trim() ? vehicleReg.trim().toUpperCase() : undefined,
+      // PCR Requirement: SM does NOT select vehicle or driver; supplier selects on dispatch
+      vehicleReg: undefined,
       requestedDate: new Date().toISOString().split('T')[0],
-      timeSlot,
+      // PCR Requirement: Suppliers can deliver at any time (open delivery window)
+      timeSlot: 'Any time (Open delivery window)',
       unitPrice,
       totalPrice,
       commercialTerms,
-      notes: 'Procured via DJ Civil Ordering Platform.',
+      notes: 'Procured via DJ Civil Site Manager Portal. Open delivery window.',
     });
 
     onClose();
@@ -126,13 +244,13 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
 
   return (
     <div className="fixed inset-0 z-[60] bg-[#14171A]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-[#FFFFFF] border border-[#E7E5E0] rounded-[12px] shadow-2xl w-full max-w-xl my-8 overflow-hidden">
+      <div className="bg-[#FFFFFF] border border-[#E7E5E0] rounded-[16px] shadow-2xl w-full max-w-xl my-8 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#E7E5E0] flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-[#14171A]">New Order / Book Service</h2>
             <p className="text-xs text-[#6B7280]">
-              Dispatch construction material deliveries or book specialist on-site maintenance services.
+              Create material orders or book specialist on-site services for Chatham Capstone or Rochester Capstone.
             </p>
           </div>
           <button
@@ -160,7 +278,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
             <div className="grid grid-cols-2 gap-2 bg-[#F7F7F5] p-1 rounded-lg text-xs">
               <button
                 type="button"
-                onClick={() => setType('material')}
+                onClick={() => handleTypeChange('material')}
                 className={`py-2 px-3 rounded-md font-medium transition-colors cursor-pointer text-center ${
                   type === 'material' ? 'bg-white text-[#14171A] shadow-xs' : 'text-[#6B7280] hover:text-[#14171A]'
                 }`}
@@ -169,7 +287,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
               </button>
               <button
                 type="button"
-                onClick={() => setType('service')}
+                onClick={() => handleTypeChange('service')}
                 className={`py-2 px-3 rounded-md font-medium transition-colors cursor-pointer text-center ${
                   type === 'service' ? 'bg-white text-[#14171A] shadow-xs' : 'text-[#6B7280] hover:text-[#14171A]'
                 }`}
@@ -179,7 +297,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
             </div>
           </div>
 
-          {/* Site & Destination (Dynamic options based on site) */}
+          {/* Site & Destination (Connected specifically to site) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
@@ -200,7 +318,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
 
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
-                Destination zone
+                Booking-Specific Destination
               </label>
               <select
                 value={destinationId}
@@ -216,11 +334,11 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
             </div>
           </div>
 
-          {/* Supplier & Logistics Allocation */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Supplier Selection & Delivery Policy */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
-                Supplier
+                Supplier / Contractor
               </label>
               <select
                 value={supplierId}
@@ -237,75 +355,43 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
 
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
-                Vehicle Reg / Unique ID
+                Delivery Schedule Window
               </label>
-              <input
-                type="text"
-                value={vehicleReg}
-                onChange={(e) => setVehicleReg(e.target.value)}
-                placeholder="e.g. KX68 VKF"
-                className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs font-mono font-medium text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
-                Requested gate slot
-              </label>
-              <input
-                type="text"
-                value={timeSlot}
-                onChange={(e) => setTimeSlot(e.target.value)}
-                placeholder="e.g. 09:00 - 10:00"
-                className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
-              />
-            </div>
-          </div>
-
-          {/* Category & Description */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-                {type === 'material' ? 'Material Category' : 'Service Category'}
-              </label>
-              <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-                <span className="text-[10px] text-[#9CA3AF] mr-1 hidden xs:inline">Quick fill:</span>
-                {(type === 'material' ? MATERIAL_PRESETS : SERVICE_PRESETS).map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => {
-                      setCategory(p.category);
-                      setDescription(p.description);
-                      setUnit(p.unit);
-                      setOrderedQty(p.qty);
-                      setUnitPrice(p.price);
-                    }}
-                    className="px-2 py-0.5 bg-[#F7F7F5] hover:bg-[#E7E5E0] text-[#14171A] rounded text-[11px] font-medium border border-[#E7E5E0] transition-colors cursor-pointer shrink-0"
-                  >
-                    {p.label}
-                  </button>
-                ))}
+              <div className="h-10 px-3 bg-[#F8F8F6] border border-[#E7E5E0] rounded-lg flex items-center gap-2 text-xs text-[#6B7280]">
+                <Clock className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                <span className="truncate">Open Delivery Window (Any time)</span>
               </div>
             </div>
-            <input
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder={type === 'material' ? 'e.g. C35/45 Marine Concrete or Sharp Sand' : 'e.g. Welfare Cabin Sanitation or Tyre Repair'}
-              className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
-            />
           </div>
 
+          {/* Category Dropdown (Required for Service, Clean Dropdown for Material) */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
-              Specification & notes
+              {type === 'service' ? 'Service Category (Select from Dropdown)' : 'Material Category'}
+            </label>
+            <select
+              value={category}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs font-medium text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
+            >
+              {(type === 'service' ? SERVICE_CATEGORIES : MATERIAL_CATEGORIES).map((item) => (
+                <option key={item.category} value={item.category}>
+                  {item.category}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Specification & Scope */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
+              Specification & Scope of Works
             </label>
             <textarea
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Provide exact pour slump, aggregate sizing, or certs required..."
+              placeholder="Provide exact mix, aggregate specification, or scope of works required..."
               className="w-full p-2.5 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
             />
           </div>
@@ -319,6 +405,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
               <input
                 type="number"
                 step="any"
+                min="0.1"
                 value={orderedQty}
                 onChange={(e) => setOrderedQty(parseFloat(e.target.value) || 0)}
                 className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] tabular-nums focus:outline-none focus:ring-1 focus:ring-[#14171A]"
@@ -338,7 +425,13 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
                 <option value="m³">m³</option>
                 <option value="loads">loads</option>
                 <option value="units">units</option>
+                <option value="lengths">lengths</option>
                 <option value="hours">hours</option>
+                <option value="visits">visits</option>
+                <option value="repairs">repairs</option>
+                <option value="days">days</option>
+                <option value="audits">audits</option>
+                <option value="shifts">shifts</option>
               </select>
             </div>
 
@@ -349,6 +442,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
               <input
                 type="number"
                 step="any"
+                min="0.01"
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(parseFloat(e.target.value) || 0)}
                 className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] tabular-nums focus:outline-none focus:ring-1 focus:ring-[#14171A]"
@@ -356,8 +450,16 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
             </div>
           </div>
 
-          {/* Commercial Terms & Total Calculation */}
-          <div className="flex items-center justify-between p-3 bg-[#F7F7F5] rounded-lg text-xs border border-[#E7E5E0]">
+          {/* Operational Policy Callout */}
+          <div className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E7E5E0] text-[11px] text-[#6B7280] space-y-1">
+            <span className="font-medium text-[#14171A] block">Logistics & Driver Allocation</span>
+            <p>
+              Driver and vehicle registration details will be assigned directly by the supplier on dispatch. Deliveries are open window without fixed time slot constraints.
+            </p>
+          </div>
+
+          {/* Commercial Commitment & Total Calculation */}
+          <div className="flex items-center justify-between p-3.5 bg-[#F7F7F5] rounded-xl text-xs border border-[#E7E5E0]">
             <div>
               <span className="text-[#6B7280] block">Commercial Commitment</span>
               <span className="text-[11px] text-[#9CA3AF]">{commercialTerms}</span>
@@ -391,4 +493,3 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
     </div>
   );
 };
-

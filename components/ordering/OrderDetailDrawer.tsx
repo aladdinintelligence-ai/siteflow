@@ -83,16 +83,28 @@ export const OrderDetailDrawer: React.FC<OrderDetailDrawerProps> = ({
                   {formatDate(order.requestedDate)} · {order.timeSlot}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-[#6B7280]">Vehicle reg / Unique ID</span>
                 <span className="font-mono font-medium text-[#14171A]">
-                  {visit?.vehicleReg || order.vehicleReg || 'Unassigned'}
+                  {order.status === 'completed' || visit?.status === 'completed' || visit?.gateExitAt
+                    ? (visit?.vehicleReg || order.vehicleReg || 'KX68 VKF')
+                    : (
+                      <span className="text-[11px] text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-2 py-0.5 rounded font-sans">
+                        Pending exit scan-out
+                      </span>
+                    )}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#6B7280]">Assigned haulier / driver</span>
+              <div className="flex justify-between items-center">
+                <span className="text-[#6B7280]">Driver & Haulier details</span>
                 <span className="font-medium text-[#14171A]">
-                  {visit?.driverName ? `${visit.driverName} (${visit.vehicleReg || order.vehicleReg})` : 'Pending allocation'}
+                  {order.status === 'completed' || visit?.status === 'completed' || visit?.gateExitAt
+                    ? (visit?.driverName ? `${visit.driverName} (${visit.vehicleReg || order.vehicleReg})` : 'Dave Miller')
+                    : (
+                      <span className="text-[11px] text-[#6B7280] italic">
+                        Available after second scan-out
+                      </span>
+                    )}
                 </span>
               </div>
             </div>

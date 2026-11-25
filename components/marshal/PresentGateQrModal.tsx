@@ -19,7 +19,7 @@ export const PresentGateQrModal: React.FC<PresentGateQrModalProps> = ({
   site,
   visits,
 }) => {
-  const { scanIn } = useAppStore();
+  const { scanIn, scanOut } = useAppStore();
   const [selectedGateId, setSelectedGateId] = useState<string>(site.gates[0]?.id || 'gate-chatham-1');
   const [simulatedSuccess, setSimulatedSuccess] = useState<string | null>(null);
 
@@ -28,13 +28,25 @@ export const PresentGateQrModal: React.FC<PresentGateQrModalProps> = ({
   const activeGate = site.gates.find((g) => g.id === selectedGateId) || site.gates[0];
   const qrPayload = `DJ-SITEFLOW-GATE://${site.code}/${activeGate?.code || 'G1'}?siteId=${site.id}&gateId=${activeGate?.id}`;
 
-  // Find an en-route arrival that can simulate a gate scan
-  const candidateVisit = visits.find((v) => ['en_route', 'scheduled'].includes(v.status));
+  // Find arrival candidate (Scan 1: Check-in)
+  const entryCandidate = visits.find((v) => ['en_route', 'scheduled'].includes(v.status));
+  // Find on-site departure candidate (Scan 2: Scan-out)
+  const exitCandidate = visits.find((v) => v.status === 'on_site');
 
-  const handleSimulateScan = () => {
-    if (!candidateVisit) return;
-    scanIn(candidateVisit.id, activeGate?.id);
-    setSimulatedSuccess(`Driver ${candidateVisit.driverName || candidateVisit.vehicleReg} scanned Gate QR`);
+  const handleSimulateEntryScan = () => {
+    if (!entryCandidate) return;
+    scanIn(entryCandidate.id, activeGate?.id);
+    setSimulatedSuccess(`Gate In: ${entryCandidate.driverName || entryCandidate.vehicleReg} scanned Gate QR`);
+    setTimeout(() => {
+      setSimulatedSuccess(null);
+      onClose();
+    }, 1200);
+  };
+
+  const handleSimulateExitScan = () => {
+    if (!exitCandidate) return;
+    scanOut(exitCandidate.id);
+    setSimulatedSuccess(`Gate Out: ${exitCandidate.driverName || exitCandidate.vehicleReg} completed 2nd exit scan`);
     setTimeout(() => {
       setSimulatedSuccess(null);
       onClose();
@@ -51,7 +63,7 @@ export const PresentGateQrModal: React.FC<PresentGateQrModalProps> = ({
               <QrCode className="w-4 h-4 text-[#F5B301]" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-[#14171A]">Gate Check-In QR Code</h2>
+              <h2 className="text-sm font-semibold text-[#14171A]">Gate QR Totem (Entry & Exit)</h2>
               <p className="text-[11px] text-[#6B7280]">
                 {site.name} ({site.code})
               </p>
@@ -109,33 +121,45 @@ export const PresentGateQrModal: React.FC<PresentGateQrModalProps> = ({
           <div className="p-3 bg-[#F7F7F5] rounded-xl border border-[#E7E5E0] text-xs text-[#6B7280] text-left space-y-1 w-full">
             <div className="flex items-center gap-1.5 font-medium text-[#14171A]">
               <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" />
-              <span>Gate Attendant Instructions</span>
+              <span>Gate Marshal Instructions</span>
             </div>
             <p className="text-[11px] leading-relaxed">
-              Present this gate QR code to arriving drivers on your terminal or gate totem. When the driver scans it, their booking will appear instantly in your table for review and entry clearance.
+              Present this QR totem to drivers at the gate. Arriving drivers scan it to check in and retrieve their booking in your table. Departing drivers scan it a second time on exit to mark their visit complete.
             </p>
           </div>
 
-          {/* Demo Simulation Button */}
-          {candidateVisit && (
-            <div className="w-full pt-1">
-              {simulatedSuccess ? (
-                <div className="p-2.5 bg-[#DCFCE7] text-[#16A34A] rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 animate-in fade-in">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{simulatedSuccess}</span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSimulateScan}
-                  className="w-full h-9 bg-white border border-[#E7E5E0] hover:bg-[#F7F7F5] text-[#14171A] rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-[#F5B301]" />
-                  <span>Simulate Arrival Scan ({candidateVisit.vehicleReg || candidateVisit.orderNumber})</span>
-                </button>
-              )}
-            </div>
-          )}
+          {/* Quick Simulation Buttons for Verification */}
+          <div className="w-full space-y-2 pt-1">
+            {simulatedSuccess ? (
+              <div className="p-2.5 bg-[#DCFCE7] text-[#16A34A] rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{simulatedSuccess}</span>
+              </div>
+            ) : (
+              <>
+                {entryCandidate && (
+                  <button
+                    type="button"
+                    onClick={handleSimulateEntryScan}
+                    className="w-full h-9 bg-white border border-[#E7E5E0] hover:bg-[#F7F7F5] text-[#14171A] rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#F5B301]" />
+                    <span>Simulate Entry Scan 1 ({entryCandidate.vehicleReg || entryCandidate.orderNumber})</span>
+                  </button>
+                )}
+                {exitCandidate && (
+                  <button
+                    type="button"
+                    onClick={handleSimulateExitScan}
+                    className="w-full h-9 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#F5B301]" />
+                    <span>Simulate Departure Scan 2 ({exitCandidate.vehicleReg || exitCandidate.orderNumber})</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Modal Footer */}

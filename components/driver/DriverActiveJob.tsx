@@ -23,19 +23,30 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
   onJobCompleted,
 }) => {
   const [isScanning, setIsScanning] = useState(false);
+  const [scanMode, setScanMode] = useState<'entry' | 'exit'>('entry');
 
   const { scanIn, scanOut } = useAppStore();
 
   const handleScanSuccess = () => {
     setIsScanning(false);
-    scanIn(job.visitId, job.gateId);
+    if (scanMode === 'exit') {
+      scanOut(job.visitId);
+      if (onJobCompleted) {
+        onJobCompleted();
+      }
+    } else {
+      scanIn(job.visitId, job.gateId);
+    }
   };
 
-  const handleScanOut = () => {
-    scanOut(job.visitId);
-    if (onJobCompleted) {
-      onJobCompleted();
-    }
+  const handleStartEntryScan = () => {
+    setScanMode('entry');
+    setIsScanning(true);
+  };
+
+  const handleStartExitScan = () => {
+    setScanMode('exit');
+    setIsScanning(true);
   };
 
   return (
@@ -104,7 +115,7 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
 
           {/* Primary Action Button: 48px in driver view */}
           <button
-            onClick={() => setIsScanning(true)}
+            onClick={handleStartEntryScan}
             className="w-full h-12 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-[0_1px_2px_rgba(20,23,26,0.04)]"
           >
             <QrCode className="w-4 h-4 text-[#F5B301]" />
@@ -162,17 +173,17 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
               Direct Route to {job.destinationName}
             </span>
             <p>
-              Offload at designated zone. When work is complete, proceed to site gate exit to record visit completion.
+              Follow the site route map above. Once delivery or service is complete, return to gate and scan the marshal&apos;s gate QR code to record exit and complete your visit.
             </p>
           </div>
 
-          {/* Primary Action Button: 48px Scan Out */}
+          {/* Primary Action Button: 48px Scan Marshal's QR to Exit */}
           <button
-            onClick={handleScanOut}
+            onClick={handleStartExitScan}
             className="w-full h-12 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-[0_1px_2px_rgba(20,23,26,0.04)]"
           >
-            <LogOut className="w-4 h-4 text-[#F5B301]" />
-            <span>Scan out (exit site)</span>
+            <QrCode className="w-4 h-4 text-[#F5B301]" />
+            <span>Scan marshal&apos;s gate QR to exit</span>
           </button>
         </div>
       )}
@@ -209,6 +220,8 @@ export const DriverActiveJob: React.FC<DriverActiveJobProps> = ({
         <CameraQrScanner
           orderNumber={job.orderNumber}
           gateName={job.gateName}
+          mode={scanMode}
+          title={scanMode === 'exit' ? 'Scan Marshal Gate QR (Exit)' : 'Scan Gate QR (Entry)'}
           onScanSuccess={handleScanSuccess}
           onClose={() => setIsScanning(false)}
         />

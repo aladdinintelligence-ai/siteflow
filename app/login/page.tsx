@@ -24,7 +24,7 @@ const SEED_PERSONAS: SeedPersona[] = [
     email: 'chris.jones@djcivil.co.uk',
     org: 'DJ Civil Engineering Ltd',
     icon: Building2,
-    desc: 'New orders, service bookings, £ spend ledger & Chatham/Rochester reports',
+    desc: 'New orders, service bookings, £ spend ledger & Chatham Capstone / Rochester Capstone reports',
   },
   {
     role: 'supplier',
@@ -46,7 +46,7 @@ const SEED_PERSONAS: SeedPersona[] = [
     role: 'marshal',
     name: 'Gary O\'Connor',
     email: 'gate1.marshal@djcivil.co.uk',
-    org: 'Chatham & Rochester Site Security',
+    org: 'Chatham Capstone & Rochester Capstone Security',
     icon: ShieldCheck,
     desc: 'Gate clearance, expected visits, safety exception flags',
   },

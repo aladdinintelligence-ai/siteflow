@@ -7,6 +7,8 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 interface CameraQrScannerProps {
   orderNumber: string;
   gateName: string;
+  mode?: 'entry' | 'exit';
+  title?: string;
   onScanSuccess: (decodedText?: string) => void;
   onClose: () => void;
 }
@@ -14,6 +16,8 @@ interface CameraQrScannerProps {
 export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
   orderNumber,
   gateName,
+  mode = 'entry',
+  title,
   onScanSuccess,
   onClose,
 }) => {
@@ -135,7 +139,9 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
         <div className="w-full flex items-center justify-between text-[#14171A]">
           <div className="flex items-center gap-2">
             <Camera className="w-4 h-4 text-[#F5B301]" />
-            <span className="text-xs font-semibold uppercase tracking-wider">Gate QR Camera</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              {title || (mode === 'exit' ? 'Gate Exit QR Scanner (Scan-Out)' : 'Gate Check-In QR Scanner')}
+            </span>
           </div>
           <button
             type="button"
@@ -169,9 +175,11 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
                 <Check className="w-6 h-6 stroke-[2.5]" />
               </div>
               <p className="text-xs font-semibold text-[#16A34A] uppercase tracking-wider">
-                QR Verified · Gate Cleared
+                {mode === 'exit' ? 'Exit Scan Verified · Visit Complete' : 'QR Verified · Gate Cleared'}
               </p>
-              <p className="text-sm font-semibold text-[#14171A] mt-0.5">Authorised for {gateName}</p>
+              <p className="text-sm font-semibold text-[#14171A] mt-0.5">
+                {mode === 'exit' ? `Exit recorded at ${gateName}` : `Authorised for ${gateName}`}
+              </p>
               <p className="text-[11px] font-mono text-[#6B7280] mt-1">{orderNumber}</p>
             </div>
           )}
@@ -215,7 +223,7 @@ export const CameraQrScanner: React.FC<CameraQrScannerProps> = ({
             className="w-full py-2 bg-[#F8F8F6] hover:bg-[#E7E5E0] text-[#14171A] rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5 text-[#6B7280]" />
-            <span>Simulate gate pass clearance</span>
+            <span>{mode === 'exit' ? 'Simulate gate exit scan' : 'Simulate gate check-in scan'}</span>
           </button>
         </div>
       </div>

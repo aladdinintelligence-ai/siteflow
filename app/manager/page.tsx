@@ -55,6 +55,7 @@ export default function SiteManagerPage() {
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [timePeriod, setTimePeriod] = useState<string>('all');
+  const [reportView, setReportView] = useState<'completed' | 'all'>('completed');
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -100,6 +101,14 @@ export default function SiteManagerPage() {
     const list = siteFilter === 'all' ? visits : visits.filter((v) => v.siteId === siteFilter);
     return list.filter((v) => v.status === 'completed' || Boolean(v.gateExitAt)).length;
   }, [visits, siteFilter]);
+
+  const reportVisits = useMemo(() => {
+    const list = siteFilter === 'all' ? visits : visits.filter((v) => v.siteId === siteFilter);
+    if (reportView === 'completed') {
+      return list.filter((v) => v.status === 'completed' || Boolean(v.gateExitAt));
+    }
+    return list;
+  }, [visits, siteFilter, reportView]);
 
   // Expenditure Analytics Calculations
   const spendBySupplier = useMemo(() => {
@@ -186,7 +195,7 @@ export default function SiteManagerPage() {
             Site Operations, Materials & Service Bookings
           </h1>
           <p className="text-xs text-[#6B7280]">
-            Complete commercial spend ledger, specialist site services, and operational reports for Chatham & Rochester.
+            Complete commercial spend ledger, specialist site services, and operational reports for Chatham Capstone & Rochester Capstone.
           </p>
         </div>
 
@@ -319,7 +328,7 @@ export default function SiteManagerPage() {
           )}
         >
           <ShieldCheck className="w-4 h-4" />
-          <span>Chatham & Rochester Operational Reports</span>
+          <span>Chatham Capstone & Rochester Capstone Reports</span>
         </button>
       </div>
 
@@ -348,7 +357,7 @@ export default function SiteManagerPage() {
                 onChange={(e) => setSiteFilter(e.target.value)}
                 className="h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A] cursor-pointer"
               >
-                <option value="all">All Sites (Chatham & Rochester)</option>
+                <option value="all">All Sites (Chatham Capstone & Rochester Capstone)</option>
                 {sites.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -493,11 +502,25 @@ export default function SiteManagerPage() {
                             </span>
                           </td>
 
-                          {/* Vehicle / ID */}
+                          {/* Vehicle / ID (Disclosed upon completed exit scan) */}
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="font-mono font-medium text-xs text-[#14171A] bg-[#F7F7F5] border border-[#E7E5E0] px-1.5 py-0.5 rounded">
-                              {order.vehicleReg || 'Unassigned'}
-                            </span>
+                            {order.status === 'completed' ? (
+                              <span className="font-mono font-medium text-xs text-[#16A34A] bg-[#DCFCE7] border border-[#BBF7D0] px-1.5 py-0.5 rounded">
+                                {order.vehicleReg || 'KX68 VKF'}
+                              </span>
+                            ) : order.status === 'on_site' ? (
+                              <span className="text-[10px] text-[#B45309] bg-[#FEF3C7] border border-[#FDE68A] px-1.5 py-0.5 rounded font-medium">
+                                On site · Exit scan pending
+                              </span>
+                            ) : order.status === 'dispatched' ? (
+                              <span className="text-[10px] text-[#2563EB] bg-[#EFF6FF] border border-[#DBEAFE] px-1.5 py-0.5 rounded font-medium">
+                                En route · Gate pending
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-[#6B7280] bg-[#F7F7F5] border border-[#E7E5E0] px-1.5 py-0.5 rounded">
+                                Pending dispatch
+                              </span>
+                            )}
                           </td>
 
                           {/* Quantity */}
@@ -641,7 +664,7 @@ export default function SiteManagerPage() {
             </div>
           </div>
 
-          {/* Site Comparison Grid: Chatham vs Rochester */}
+          {/* Site Comparison Grid: Chatham Capstone vs Rochester Capstone */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {spendBySite.map((s) => (
               <div key={s.code} className="bg-white border border-[#E7E5E0] rounded-[16px] p-5 shadow-[0_1px_2px_rgba(20,23,26,0.04)] space-y-3">
@@ -675,16 +698,47 @@ export default function SiteManagerPage() {
         <div className="space-y-4">
           <div className="bg-white border border-[#E7E5E0] rounded-[12px] p-4 shadow-[0_1px_2px_rgba(20,23,26,0.04)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div>
-              <h3 className="font-semibold text-sm text-[#14171A]">Site Gate Attendance & Turnaround Audit</h3>
-              <p className="text-xs text-[#6B7280]">Traceable gate logs, entry times, duration records, and scan-out completion</p>
+              <h3 className="font-semibold text-sm text-[#14171A]">Completed Attendance & Delivery Report</h3>
+              <p className="text-xs text-[#6B7280]">
+                Driver & vehicle details are confirmed upon second exit scan. Pre-exit bookings remain in operational view.
+              </p>
             </div>
-            <button
-              onClick={handleExportCSV}
-              className="h-9 px-3 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export Full CSV Audit</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex bg-[#F7F7F5] p-0.5 rounded-lg border border-[#E7E5E0]">
+                <button
+                  type="button"
+                  onClick={() => setReportView('completed')}
+                  className={cn(
+                    'px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer',
+                    reportView === 'completed'
+                      ? 'bg-white text-[#14171A] shadow-xs'
+                      : 'text-[#6B7280] hover:text-[#14171A]'
+                  )}
+                >
+                  Completed Deliveries ({completedVisitsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportView('all')}
+                  className={cn(
+                    'px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer',
+                    reportView === 'all'
+                      ? 'bg-white text-[#14171A] shadow-xs'
+                      : 'text-[#6B7280] hover:text-[#14171A]'
+                  )}
+                >
+                  All Gate Logs ({visits.length})
+                </button>
+              </div>
+
+              <button
+                onClick={handleExportCSV}
+                className="h-8 px-3 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV</span>
+              </button>
+            </div>
           </div>
 
           <div className="bg-white border border-[#E7E5E0] rounded-[12px] shadow-[0_1px_2px_rgba(20,23,26,0.04)] overflow-hidden">
@@ -703,52 +757,87 @@ export default function SiteManagerPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E7E5E0]">
-                  {visits.map((v) => (
-                    <tr key={v.id} className="h-13 hover:bg-[#F7F7F5] transition-colors">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="font-mono font-semibold text-xs text-[#14171A] block">
-                          {v.orderNumber}
-                        </span>
-                        <span className="text-[10px] font-mono text-[#6B7280]">{v.id}</span>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span className="font-medium text-[#14171A] text-xs block max-w-[170px] truncate">
-                          {v.destinationName}
-                        </span>
-                        <span className="text-[10px] text-[#6B7280]">{v.siteName}</span>
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="font-medium text-[#14171A]">{v.driverName || 'Driver'}</span>
-                        <span className="text-[10px] text-[#6B7280] block">{v.supplierName}</span>
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="font-mono font-medium text-xs text-[#14171A] bg-[#F7F7F5] border border-[#E7E5E0] px-1.5 py-0.5 rounded">
-                          {v.vehicleReg}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280]">
-                        {v.gateEntryAt ? formatDateTime(v.gateEntryAt) : 'Pending'}
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280]">
-                        {v.gateExitAt ? formatDateTime(v.gateExitAt) : (v.status === 'on_site' ? 'Currently on site' : '—')}
-                      </td>
-
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <span className="font-mono font-semibold text-[#14171A]">
-                          {v.durationMinutes ? `${v.durationMinutes} min` : (v.status === 'on_site' ? 'Active' : '—')}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
-                        <StatusBadge status={v.status} size="sm" />
+                  {reportVisits.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-12 text-center text-[#6B7280]">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <Clock className="w-8 h-8 text-[#9CA3AF] stroke-1" />
+                          <span className="font-medium text-[#14171A]">
+                            No completed deliveries to display
+                          </span>
+                          <p className="text-xs text-[#9CA3AF] max-w-sm">
+                            Deliveries appear in this report table once the driver performs their second scan-out at the site exit gate.
+                          </p>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    reportVisits.map((v) => {
+                      const isScannedOut = v.status === 'completed' || Boolean(v.gateExitAt);
+                      return (
+                        <tr key={v.id} className="h-13 hover:bg-[#F7F7F5] transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="font-mono font-semibold text-xs text-[#14171A] block">
+                              {v.orderNumber}
+                            </span>
+                            <span className="text-[10px] font-mono text-[#6B7280]">{v.id}</span>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <span className="font-medium text-[#14171A] text-xs block max-w-[170px] truncate">
+                              {v.destinationName}
+                            </span>
+                            <span className="text-[10px] text-[#6B7280]">{v.siteName}</span>
+                          </td>
+
+                          {/* Driver Details - Visible only after driver scans out for the second time */}
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {isScannedOut ? (
+                              <>
+                                <span className="font-medium text-[#14171A]">{v.driverName || 'Dave Miller'}</span>
+                                <span className="text-[10px] text-[#6B7280] block">{v.supplierName}</span>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-[#9CA3AF] italic">
+                                Hidden until exit scan-out
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Vehicle Details - Visible only after driver scans out for the second time */}
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {isScannedOut ? (
+                              <span className="font-mono font-medium text-xs text-[#16A34A] bg-[#DCFCE7] border border-[#BBF7D0] px-1.5 py-0.5 rounded">
+                                {v.vehicleReg || 'KX68 VKF'}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-[#9CA3AF] italic">
+                                Disclosed after exit
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280]">
+                            {v.gateEntryAt ? formatDateTime(v.gateEntryAt) : 'Pending'}
+                          </td>
+
+                          <td className="px-4 py-3 whitespace-nowrap font-mono text-[#6B7280]">
+                            {v.gateExitAt ? formatDateTime(v.gateExitAt) : (v.status === 'on_site' ? 'Currently on site' : '—')}
+                          </td>
+
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <span className="font-mono font-semibold text-[#14171A]">
+                              {v.durationMinutes ? `${v.durationMinutes} min` : (v.status === 'on_site' ? 'Active' : '—')}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3 text-center whitespace-nowrap">
+                            <StatusBadge status={v.status} size="sm" />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
