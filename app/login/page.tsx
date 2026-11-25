@@ -19,20 +19,12 @@ interface SeedPersona {
 
 const SEED_PERSONAS: SeedPersona[] = [
   {
-    role: 'director',
-    name: 'Sarah Jenkins',
-    email: 'director@djcivil.co.uk',
+    role: 'manager',
+    name: 'Chris Jones',
+    email: 'chris.jones@djcivil.co.uk',
     org: 'DJ Civil Engineering Ltd',
     icon: Building2,
-    desc: 'Commercial spend, orders table, discrepancy rates',
-  },
-  {
-    role: 'ordering',
-    name: 'Callum Vance',
-    email: 'ordering@djcivil.co.uk',
-    org: 'DJ Civil Procurement',
-    icon: FileSpreadsheet,
-    desc: 'New purchase orders, laydown destination booking',
+    desc: 'New orders, service bookings, £ spend ledger & Chatham/Rochester reports',
   },
   {
     role: 'supplier',
@@ -76,10 +68,10 @@ function LoginForm() {
   const redirectPath = searchParams.get('redirect') || null;
   const isDenied = searchParams.get('denied') === 'true';
 
-  const [email, setEmail] = useState<string>('director@djcivil.co.uk');
+  const [email, setEmail] = useState<string>('chris.jones@djcivil.co.uk');
   const [password, setPassword] = useState<string>('SiteFlow2026!');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [selectedPersona, setSelectedPersona] = useState<RoleId>('director');
+  const [selectedPersona, setSelectedPersona] = useState<RoleId>('manager');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,13 +96,13 @@ function LoginForm() {
       <div className="md:col-span-6 bg-white border border-[#E7E5E0] rounded-[16px] shadow-[0_4px_20px_rgba(20,23,26,0.06)] p-6 sm:p-8 space-y-6">
         {/* Brand Header */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-[#14171A] text-white flex items-center justify-center text-xs font-bold">
-              DF
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span className="font-semibold text-base tracking-tight text-[#14171A]">DJ Civil</span>
-              <span className="font-semibold text-base tracking-tight text-[#6B7280]">SiteFlow</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-[#14171A] flex items-center justify-center shrink-0 border border-[#E7E5E0]">
+              <img src="/logo.svg" alt="DJ Civil" className="w-full h-full object-cover" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-semibold text-lg tracking-tight text-[#14171A]">DJ Civil</span>
+              <span className="font-semibold text-lg tracking-tight text-[#6B7280]">SiteFlow</span>
             </div>
           </div>
           <h1 className="text-xl font-semibold text-[#14171A] tracking-tight">Operations Portal Sign In</h1>
@@ -149,7 +141,7 @@ function LoginForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. director@djcivil.co.uk"
+              placeholder="e.g. chris.jones@djcivil.co.uk"
               className="w-full h-10 px-3 bg-[#F8F8F6] border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] outline-none focus:border-[#14171A] transition-colors"
             />
           </div>

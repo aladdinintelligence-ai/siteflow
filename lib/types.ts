@@ -1,10 +1,11 @@
 export type RoleId =
-  | 'director'
-  | 'ordering'
+  | 'manager'
   | 'supplier'
   | 'driver'
   | 'marshal'
-  | 'analyst';
+  | 'analyst'
+  | 'director'
+  | 'ordering';
 
 export type OrderStatus =
   | 'pending'

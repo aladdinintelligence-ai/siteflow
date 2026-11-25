@@ -501,6 +501,11 @@ export const useAppStore = create<AppState>()(
         const isDisputed =
           targetVisit.serviceCompletedStatus === 'disputed' || targetVisit.status === 'flagged';
 
+        const allVisitsForOrder = get().visits.filter((v) => v.orderId === targetVisit.orderId);
+        const hasOtherIncompleteVisits = allVisitsForOrder.some(
+          (v) => v.id !== visitId && v.status !== 'completed'
+        );
+
         set((state) => ({
           visits: state.visits.map((v) =>
             v.id === visitId
@@ -516,7 +521,11 @@ export const useAppStore = create<AppState>()(
             o.id === targetVisit.orderId
               ? {
                   ...o,
-                  status: isDisputed ? 'disputed' : 'completed',
+                  status: isDisputed
+                    ? 'disputed'
+                    : hasOtherIncompleteVisits
+                    ? o.status
+                    : 'completed',
                 }
               : o
           ),

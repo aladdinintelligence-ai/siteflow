@@ -29,8 +29,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Role to path mapping
 export const ROLE_HOME_PATHS: Record<RoleId, string> = {
-  director: '/director',
-  ordering: '/ordering',
+  manager: '/manager',
+  director: '/manager',
+  ordering: '/manager',
   supplier: '/supplier',
   driver: '/driver',
   marshal: '/marshal',
@@ -39,13 +40,14 @@ export const ROLE_HOME_PATHS: Record<RoleId, string> = {
 
 // Route access rules
 export const ROUTE_PERMISSIONS: Record<string, RoleId[]> = {
-  '/director': ['director'],
-  '/ordering': ['ordering', 'director'],
-  '/supplier': ['supplier', 'director'],
-  '/driver': ['driver', 'director'],
-  '/marshal': ['marshal', 'director'],
-  '/analyst': ['analyst', 'director'],
-  '/discovery': ['director'],
+  '/manager': ['manager', 'director', 'ordering'],
+  '/director': ['manager', 'director', 'ordering'],
+  '/ordering': ['manager', 'director', 'ordering'],
+  '/supplier': ['supplier', 'manager', 'director'],
+  '/driver': ['driver', 'manager', 'director'],
+  '/marshal': ['marshal', 'manager', 'director'],
+  '/analyst': ['analyst', 'manager', 'director'],
+  '/discovery': ['manager', 'director'],
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

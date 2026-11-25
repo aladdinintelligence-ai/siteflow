@@ -3,18 +3,20 @@ import type { NextRequest } from 'next/server';
 
 // Route permissions mapping
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
-  '/director': ['director'],
-  '/ordering': ['ordering', 'director'],
-  '/supplier': ['supplier', 'director'],
-  '/driver': ['driver', 'director'],
-  '/marshal': ['marshal', 'director'],
-  '/analyst': ['analyst', 'director'],
-  '/discovery': ['director'],
+  '/manager': ['manager', 'director', 'ordering'],
+  '/director': ['manager', 'director', 'ordering'],
+  '/ordering': ['manager', 'director', 'ordering'],
+  '/supplier': ['supplier', 'manager', 'director'],
+  '/driver': ['driver', 'manager', 'director'],
+  '/marshal': ['marshal', 'manager', 'director'],
+  '/analyst': ['analyst', 'manager', 'director'],
+  '/discovery': ['manager', 'director'],
 };
 
 const ROLE_DEFAULT_PATHS: Record<string, string> = {
-  director: '/director',
-  ordering: '/ordering',
+  manager: '/manager',
+  director: '/manager',
+  ordering: '/manager',
   supplier: '/supplier',
   driver: '/driver',
   marshal: '/marshal',
@@ -45,10 +47,15 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('siteflow_jwt_token')?.value;
   const payload = token ? decodeJwtPayload(token) : null;
 
+  // Redirect legacy /director and /ordering to unified /manager dashboard
+  if (pathname === '/director' || pathname === '/ordering') {
+    return NextResponse.redirect(new URL('/manager', request.url));
+  }
+
   // 1. Root route: automatically redirect to authorized portal or login
   if (pathname === '/') {
     if (payload && payload.role) {
-      const defaultPath = ROLE_DEFAULT_PATHS[payload.role] || '/director';
+      const defaultPath = ROLE_DEFAULT_PATHS[payload.role] || '/manager';
       return NextResponse.redirect(new URL(defaultPath, request.url));
     }
     return NextResponse.redirect(new URL('/login', request.url));
@@ -57,7 +64,7 @@ export function middleware(request: NextRequest) {
   // 2. If user is on /login
   if (pathname === '/login') {
     if (payload && payload.role && !request.nextUrl.searchParams.has('switch')) {
-      const defaultPath = ROLE_DEFAULT_PATHS[payload.role] || '/director';
+      const defaultPath = ROLE_DEFAULT_PATHS[payload.role] || '/manager';
       return NextResponse.redirect(new URL(defaultPath, request.url));
     }
     return NextResponse.next();
@@ -96,6 +103,7 @@ export const config = {
   matcher: [
     '/',
     '/login',
+    '/manager/:path*',
     '/director/:path*',
     '/ordering/:path*',
     '/supplier/:path*',

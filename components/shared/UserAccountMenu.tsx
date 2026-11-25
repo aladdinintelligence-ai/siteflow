@@ -42,7 +42,7 @@ export const UserAccountMenu: React.FC = () => {
     );
   }
 
-  const roleConfig = ROLES[user.role] || ROLES.director;
+  const roleConfig = ROLES[user.role] || ROLES.manager;
   const homePath = ROLE_HOME_PATHS[user.role] || '/';
 
   return (

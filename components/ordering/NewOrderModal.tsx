@@ -11,6 +11,22 @@ interface NewOrderModalProps {
   onClose: () => void;
 }
 
+const MATERIAL_PRESETS = [
+  { label: 'Sand', category: 'Sharp Washed Concreting Sand (0-4mm)', description: 'Bulk washed sand for structural slab bedding and quayside screed.', unit: 'tonnes', qty: 20, price: 26.5 },
+  { label: 'Wood', category: 'C24 Structural Timber 47x150mm', description: 'Kiln-dried treated structural timber carcassing 4.8m lengths.', unit: 'units', qty: 120, price: 14.5 },
+  { label: 'Pipes', category: '300mm Twinwall Drainage Pipes (6m)', description: 'High-density polyethylene surface water carrier pipe with couplers.', unit: 'lengths', qty: 35, price: 78.0 },
+  { label: 'Cement', category: 'C35/45 Ready-Mix Structural Concrete', description: 'Marine concrete pump mix, slump 120mm, high sulphate resistance.', unit: 'm³', qty: 24, price: 115.0 },
+  { label: 'Aggregates', category: 'MOT Type 1 Sub-Base Granite', description: '0-40mm crushed granite aggregate for heavy haul road base.', unit: 'tonnes', qty: 28, price: 24.5 },
+];
+
+const SERVICE_PRESETS = [
+  { label: 'Toilet Cleaning', category: 'Welfare Cabins & Toilet Sanitation', description: 'Weekly complete waste tank pump-out, chemical recharge and deep sanitisation.', unit: 'visits', qty: 1, price: 160.0 },
+  { label: 'Tyre Repairs', category: 'Mobile Plant / 8-Wheeler Tyre Repair', description: 'Emergency on-site vulcanising puncture repair and tyre bead refitting.', unit: 'repairs', qty: 2, price: 185.0 },
+  { label: 'Machinery Repairs', category: 'Excavator Hydraulic & Mechanical Repair', description: 'Mobile field engineer for 30t excavator hydraulic line leak and ram repair.', unit: 'hours', qty: 4, price: 95.0 },
+  { label: 'Dust Suppression', category: 'Site Road Dust Suppression Bowser', description: '10,000L tractor-towed road pressure spray for quayside haul roads.', unit: 'days', qty: 1, price: 420.0 },
+  { label: 'Scaffolding Audit', category: 'Scaffolding & Edge Protection Inspection', description: 'Weekly working-at-height statutory safety inspection and green tag handover.', unit: 'audits', qty: 1, price: 210.0 },
+];
+
 export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose }) => {
   const { sites, suppliers, currentSiteId, createOrder } = useAppStore();
 
@@ -114,9 +130,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#E7E5E0] flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-[#14171A]">Create purchase order</h2>
+            <h2 className="text-base font-semibold text-[#14171A]">New Order / Book Service</h2>
             <p className="text-xs text-[#6B7280]">
-              Dispatch a direct order to a Tier 1 supplier or specialist contractor.
+              Dispatch construction material deliveries or book specialist on-site maintenance services.
             </p>
           </div>
           <button
@@ -139,26 +155,26 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
           {/* Type Toggle: Material vs Service */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1.5">
-              Order type
+              Booking Type
             </label>
             <div className="grid grid-cols-2 gap-2 bg-[#F7F7F5] p-1 rounded-lg text-xs">
               <button
                 type="button"
                 onClick={() => setType('material')}
-                className={`py-2 rounded-md font-medium transition-colors cursor-pointer text-center ${
+                className={`py-2 px-3 rounded-md font-medium transition-colors cursor-pointer text-center ${
                   type === 'material' ? 'bg-white text-[#14171A] shadow-xs' : 'text-[#6B7280] hover:text-[#14171A]'
                 }`}
               >
-                Materials (Concrete, Aggregate, Steel)
+                Materials (Sand, Wood, Pipes, Cement)
               </button>
               <button
                 type="button"
                 onClick={() => setType('service')}
-                className={`py-2 rounded-md font-medium transition-colors cursor-pointer text-center ${
+                className={`py-2 px-3 rounded-md font-medium transition-colors cursor-pointer text-center ${
                   type === 'service' ? 'bg-white text-[#14171A] shadow-xs' : 'text-[#6B7280] hover:text-[#14171A]'
                 }`}
               >
-                Specialist Service (Crane, Vac Ex, Piling)
+                Services (Toilet Cleaning, Repairs)
               </button>
             </div>
           </div>
@@ -248,14 +264,35 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
 
           {/* Category & Description */}
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280] block mb-1">
-              Item / service category
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+                {type === 'material' ? 'Material Category' : 'Service Category'}
+              </label>
+              <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+                <span className="text-[10px] text-[#9CA3AF] mr-1 hidden xs:inline">Quick fill:</span>
+                {(type === 'material' ? MATERIAL_PRESETS : SERVICE_PRESETS).map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => {
+                      setCategory(p.category);
+                      setDescription(p.description);
+                      setUnit(p.unit);
+                      setOrderedQty(p.qty);
+                      setUnitPrice(p.price);
+                    }}
+                    className="px-2 py-0.5 bg-[#F7F7F5] hover:bg-[#E7E5E0] text-[#14171A] rounded text-[11px] font-medium border border-[#E7E5E0] transition-colors cursor-pointer shrink-0"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g. C35/45 Structural Concrete"
+              placeholder={type === 'material' ? 'e.g. C35/45 Marine Concrete or Sharp Sand' : 'e.g. Welfare Cabin Sanitation or Tyre Repair'}
               className="w-full h-10 px-3 bg-white border border-[#E7E5E0] rounded-lg text-xs text-[#14171A] focus:outline-none focus:ring-1 focus:ring-[#14171A]"
             />
           </div>
@@ -344,9 +381,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({ isOpen, onClose })
             </button>
             <button
               type="submit"
-              className="h-10 px-4 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
+              className="h-10 px-5 bg-[#14171A] hover:bg-[#2A2F35] text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
             >
-              Submit order to supplier
+              <span>Confirm & Dispatch Booking</span>
             </button>
           </div>
         </form>

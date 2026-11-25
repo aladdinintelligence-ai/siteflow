@@ -11,7 +11,7 @@ export default function RootPage() {
   useEffect(() => {
     if (isLoading) return;
     if (user && user.role) {
-      const target = ROLE_HOME_PATHS[user.role] || '/director';
+      const target = ROLE_HOME_PATHS[user.role] || '/manager';
       router.replace(target);
     } else {
       router.replace('/login');

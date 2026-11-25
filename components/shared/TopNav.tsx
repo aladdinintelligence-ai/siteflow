@@ -30,10 +30,10 @@ export const TopNav: React.FC = () => {
       <div className="max-w-[1280px] h-full mx-auto px-3 sm:px-6 flex items-center justify-between gap-1.5 sm:gap-4">
         {/* Left: Product Logo & Site Context */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <Link href="/" className="flex items-center gap-1.5 group">
-            <span className="w-5 h-5 rounded-md bg-[#14171A] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-              DF
-            </span>
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="w-6 h-6 rounded-md overflow-hidden bg-[#14171A] flex items-center justify-center shrink-0 border border-[#E7E5E0]">
+              <img src="/logo.svg" alt="DJ Civil" className="w-full h-full object-cover" />
+            </div>
             <div className="flex items-baseline gap-1">
               <span className="font-semibold text-xs sm:text-sm tracking-tight text-[#14171A]">
                 DJ Civil
